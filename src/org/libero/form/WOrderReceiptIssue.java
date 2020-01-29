@@ -60,6 +60,8 @@ import org.compiere.model.MLocatorLookup;
 import org.compiere.model.MLookup;
 import org.compiere.model.MLookupFactory;
 import org.compiere.model.MProduct;
+import org.compiere.model.MProduction;
+import org.compiere.model.MProductionLine;
 import org.compiere.model.MTab;
 import org.compiere.model.MWindow;
 import org.compiere.util.DisplayType;
@@ -476,7 +478,7 @@ ValueChangeListener,Serializable,WTableModelListener
 			 			
 			if ( result == 1)
 			{				
-				final boolean isCloseDocument = (Messagebox.show(Msg.parseTranslation(Env.getCtx(),"@IsCloseDocument@ : &&&&"+  getPP_Order().getDocumentNo()),"",Messagebox.OK|Messagebox.CANCEL,Messagebox.QUESTION) == Messagebox.OK);
+				final boolean isCloseDocument = (Messagebox.show(Msg.parseTranslation(Env.getCtx(),"@IsCloseDocument@: &&&&"+  getPP_Order().getDocumentNo()),"",Messagebox.OK|Messagebox.CANCEL,Messagebox.QUESTION) == Messagebox.OK);
 
 				if (cmd_process(isCloseDocument, issue))
 				{
@@ -898,6 +900,56 @@ ValueChangeListener,Serializable,WTableModelListener
 					if (isBackflush() || isOnlyIssue()) 
 					{
 						createIssue(order, issue);
+						//Create the production
+						MProduction production = new MProduction(Env.getCtx(), 0, trxName);
+						
+						production.setAD_Org_ID(order.getAD_Client_ID());
+						production.setM_Product_ID(order.getM_Product_ID());
+						production.setDatePromised(order.getDatePromised());
+						production.setMovementDate(new Timestamp(System.currentTimeMillis()));
+						production.setM_Locator_ID(order.getM_Locator_ID());
+						production.setProductionQty(order.getQtyEntered());
+						production.setIsCreated("Y");
+						production.set_ValueOfColumn("PP_Order_ID", order.get_ID());
+						production.saveEx(production.get_TrxName());
+						
+						int lineNumber = 10;
+						
+						 for(MPPOrderBOMLine line: order.getLines()) {
+							 
+							 MProductionLine mpl = new MProductionLine(production);
+							 mpl.setAD_Org_ID(line.getAD_Client_ID());
+							 mpl.setLine(line.getLine());
+							 mpl.setM_Product_ID(line.getM_Product_ID());
+							 if(line.get_ValueAsBoolean("IsDerivatite")) {
+								 mpl.setIsEndProduct(true);
+								 mpl.setMovementQty(line.getQtyRequired().abs());
+							 }else {
+								 mpl.setIsEndProduct(false);
+							 }
+							 mpl.setQtyUsed(line.getQtyRequired());
+							 mpl.setM_Locator_ID(line.getM_Locator_ID());
+							 mpl.saveEx(production.get_TrxName());
+							 
+							 lineNumber = lineNumber + 10;
+						 }
+
+						 MProductionLine mpl1 = new MProductionLine(production);
+						 mpl1.setAD_Org_ID(order.getAD_Client_ID());
+						 mpl1.setLine(lineNumber);
+						 mpl1.setM_Product_ID(order.getM_Product_ID());
+						 mpl1.setIsEndProduct(true);
+						 mpl1.setMovementQty(order.getQtyOrdered().abs());
+						 mpl1.setQtyUsed(order.getQtyOrdered());
+						 mpl1.setM_Locator_ID(order.getM_Locator_ID());
+						 mpl1.saveEx(production.get_TrxName());
+						 
+						 if(!production.processIt(MProduction.DOCACTION_Complete)) {
+							 throw new AdempiereException(production.getProcessMsg());
+						 }
+
+						 production.saveEx(order.get_TrxName());
+						
 					}
 					if (isOnlyReceipt() || isBackflush()) 
 					{

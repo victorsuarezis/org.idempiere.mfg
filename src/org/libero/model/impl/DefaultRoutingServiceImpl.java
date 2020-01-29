@@ -605,7 +605,7 @@ public class DefaultRoutingServiceImpl implements RoutingService
 		 String baseUOMResource = node.getS_Resource().getS_ResourceType().getC_UOM().getUOMSymbol().trim();
 		 double durationBaseSec = getDurationBaseSec(baseUOMResource);// 1 hour = 3600 seconds
 		 if (durationBaseSec == 0) {
-			 throw new AdempiereException("@NotSupported@ @C_UOM_ID@ - "+baseUOMResource);
+			 throw new AdempiereException("@NotSupported@ @C_UOM_ID@"+baseUOMResource);
 		 }
 		 BigDecimal durationRealUOM =   durationRealMinutes.multiply(BigDecimal.valueOf(60)).divide(BigDecimal.valueOf(durationBaseSec), 8, RoundingMode.UP); //FERRY
 		 ra.setQty(durationRealUOM);
@@ -689,7 +689,7 @@ public class DefaultRoutingServiceImpl implements RoutingService
 		}
 		else
 		{
-			throw new AdempiereException("@NotSupported@ @C_UOM_ID@ - "+resourceUOM);
+			throw new AdempiereException("@NotSupported@ @C_UOM_ID@ - "+resourceUOM); //aqui es donde revienta
 		}
 	}
 

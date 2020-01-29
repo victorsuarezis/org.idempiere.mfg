@@ -1,5 +1,5 @@
 /******************************************************************************
- * Product: Adempiere ERP & CRM Smart Business Solution                       *
+  * Product: Adempiere ERP & CRM Smart Business Solution                       *
  * This program is free software; you can redistribute it and/or modify it    *
  * under the terms version 2 of the GNU General Public License as published   *
  * by the Free Software Foundation. This program is distributed in the hope   *
@@ -17,11 +17,15 @@
 package org.libero.process;
 
 
+import java.sql.Timestamp;
 import java.util.logging.Level;
 
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.exceptions.FillMandatoryException;
+import org.compiere.model.MMovement;
+import org.compiere.model.MMovementLine;
 import org.compiere.model.MQuery;
+import org.compiere.model.MStorageReservation;
 import org.compiere.model.MTable;
 import org.compiere.model.PrintInfo;
 import org.compiere.print.MPrintFormat;
@@ -31,6 +35,7 @@ import org.compiere.process.ClientProcess;
 import org.compiere.process.ProcessInfoParameter;
 import org.compiere.process.SvrProcess;
 import org.libero.model.MPPOrder;
+import org.libero.model.MPPOrderBOMLine;
 
 /**
  * Complete & Print Manufacturing Order
@@ -47,6 +52,8 @@ implements ClientProcess
 	@SuppressWarnings("unused")
 	private boolean p_IsPrintPackList = false; // for future use
 	private boolean p_IsComplete = false;
+	private int p_M_LocatorTo_ID = 0;
+	private int C_DocType_ID = 0;
 
 	/**
 	 * Prepare - e.g., get Parameters.
@@ -56,21 +63,26 @@ implements ClientProcess
 		for (ProcessInfoParameter para : getParameter())
 		{
 			String name = para.getParameterName();
-			if (para.getParameter() == null)
-				;
+			if (para.getParameter() == null);
 			else if (name.equals("PP_Order_ID"))
-				p_PP_Order_ID = para.getParameterAsInt();
+				p_PP_Order_ID = para.getParameterAsInt(); 
 			else if (name.equals("IsPrintPickList"))
-				p_IsPrintPickList = para.getParameterAsBoolean();
+				p_IsPrintPickList = para.getParameterAsBoolean();				
 			else if (name.equals("IsPrintWorkflow"))
 				p_IsPrintWorkflow = para.getParameterAsBoolean();
 			else if (name.equals("IsPrintPackingList"))
 				p_IsPrintPackList = para.getParameterAsBoolean();
 			else if (name.equals("IsComplete"))
-				p_IsComplete = para.getParameterAsBoolean();
+				p_IsComplete = para.getParameterAsBoolean(); 
+			else if (name.equals("M_LocatorTo_ID"))
+				p_M_LocatorTo_ID = para.getParameterAsInt();
+			else if (name.equals("C_DocType_ID"))
+				C_DocType_ID = para.getParameterAsInt();
 			else
 				log.log(Level.SEVERE, "prepare - Unknown Parameter: " + name);
 		}
+		
+		
 	} // prepare
 
 	/**
@@ -90,10 +102,17 @@ implements ClientProcess
 
 		if (p_IsComplete)
 		{
+			
 			MPPOrder order = new MPPOrder(getCtx(), p_PP_Order_ID, get_TrxName());
+			order.saveEx();
 			if (!order.isAvailable())
 			{
 				throw new AdempiereException("@NoQtyAvailable@");
+			}
+			
+			if(order.isProductWithOutQty()) {
+				String fields = order.crititalProductsWithOutInventory(order.get_ID());
+				throw new AdempiereException("Los siguientes productos: "+fields+"son criticos y no tienen Inventario, para poder realizar la Operacion dichos productos deben tener Existencia **");
 			}
 			//
 			// Process document
@@ -102,13 +121,99 @@ implements ClientProcess
 			if (!ok)
 			{
 				throw new AdempiereException(order.getProcessMsg());
+			}else{
+				
+				// Para guardar el anterior Localizador
+				int tmp_locator = 0;
+				/* Para guardar el anterior encabezado */
+				MMovement tmp_m_movement = null;
+				
+				for(MPPOrderBOMLine line : order.getLines()) {
+					
+					if(!line.get_ValueAsBoolean("IsDerivative") && !line.get_ValueAsBoolean("IsRacking")) {
+						
+						if(order.isProductWithInventory(line.getM_Product_ID(),order.get_ID())) {
+							
+							// si es diferente del anterior crea una nueva cabezera...
+							if(tmp_locator != line.getM_Locator_ID()) {
+								
+								// crea una nueva cabezera 
+								MMovement m_movement = new MMovement(getCtx(), 0, get_TrxName());
+								m_movement.setAD_Org_ID(order.getAD_Org_ID());
+								m_movement.setMovementDate(new Timestamp(System.currentTimeMillis()));
+								m_movement.setC_DocType_ID(C_DocType_ID);
+								m_movement.setIsApproved(false);
+								m_movement.setIsInTransit(false);
+								m_movement.saveEx(get_TrxName());
+								
+								// guarda el objecto del movimiento
+								tmp_m_movement = m_movement;
+								
+								// crea una nueva linea 
+								MMovementLine m_movement_line = new MMovementLine(m_movement);
+								m_movement_line.setAD_Org_ID(line.getAD_Org_ID());
+								m_movement_line.setLine(line.getLine());
+								m_movement_line.setM_Product_ID(line.getM_Product_ID());
+								m_movement_line.setM_Locator_ID(line.getM_Locator_ID());
+								m_movement_line.setM_LocatorTo_ID(p_M_LocatorTo_ID);
+								m_movement_line.setMovementQty(line.getQtyRequired());
+								m_movement_line.saveEx(get_TrxName());
+								
+							}else {
+								// si igual al anterior agrega una linea mas
+								MMovementLine m_movement_line = new MMovementLine(tmp_m_movement);
+								m_movement_line.setAD_Org_ID(line.getAD_Org_ID());
+								m_movement_line.setLine(line.getLine());
+								m_movement_line.setM_Product_ID(line.getM_Product_ID());
+								m_movement_line.setM_Locator_ID(line.getM_Locator_ID());
+								m_movement_line.setM_LocatorTo_ID(p_M_LocatorTo_ID);
+								System.out.println("Localizador: "+line.getM_Locator_ID());
+								m_movement_line.setMovementQty(line.getQtyRequired());
+								m_movement_line.saveEx(get_TrxName());	
+							}
+							//Enviar la misma orden de manufactura
+							if(!tmp_m_movement.processIt(MMovement.DOCACTION_Prepare))
+							{
+								throw new AdempiereException(tmp_m_movement.getProcessMsg());
+							}
+							
+							tmp_m_movement.set_ValueOfColumn("PP_Order_ID", order.get_ID());
+							tmp_m_movement.saveEx(get_TrxName());
+							
+							tmp_locator = line.getM_Locator_ID();
+					
+						}
+					}
+				}						
+				
+				for(MPPOrderBOMLine line : order.getLines()) {
+					
+					if(!MStorageReservation.add(getCtx(), 
+							line.getM_Warehouse_ID(),
+							line.getM_Product_ID(), 
+							line.getM_AttributeSetInstance_ID(), 
+							line.getQtyRequired(), 
+							true, 
+							get_TrxName())) {
+						
+						throw new AdempiereException();
+						
+					}
+					
+				}
+				
 			}
+			
 			//
 			// Document Status should be completed
 			if (!MPPOrder.DOCSTATUS_Completed.equals(order.getDocStatus()))
 			{
 				throw new AdempiereException(order.getProcessMsg());
 			}
+			
+			
+			
+			
 		}
 
 		if (p_IsPrintPickList)

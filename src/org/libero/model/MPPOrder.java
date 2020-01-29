@@ -9,7 +9,9 @@ package org.libero.model;
 import java.io.File;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -18,8 +20,10 @@ import java.util.Properties;
 import java.util.TreeSet;
 
 import org.adempiere.exceptions.AdempiereException;
+import org.adempiere.exceptions.DBException;
 import org.adempiere.exceptions.DocTypeNotFoundException;
 import org.adempiere.model.engines.CostDimension;
+import org.compiere.acct.Doc_InOut;
 import org.compiere.model.MAcctSchema;
 import org.compiere.model.MClient;
 import org.compiere.model.MCost;
@@ -28,6 +32,8 @@ import org.compiere.model.MLocator;
 import org.compiere.model.MOrder;
 import org.compiere.model.MOrderLine;
 import org.compiere.model.MProduct;
+import org.compiere.model.MProduction;
+import org.compiere.model.MProductionLine;
 import org.compiere.model.MProject;
 import org.compiere.model.MResource;
 import org.compiere.model.MStorageOnHand;
@@ -322,6 +328,7 @@ public class MPPOrder extends X_PP_Order implements DocAction
 	public MPPOrder(Properties ctx, ResultSet rs, String trxName)
 	{
 		super(ctx, rs, trxName);
+		log.info("Entrando a la clase modelo");
 	} //	MOrder
 
 	/**
@@ -347,7 +354,8 @@ public class MPPOrder extends X_PP_Order implements DocAction
 		String whereClause = MPPOrderBOMLine.COLUMNNAME_PP_Order_ID+"=?";
 		List<MPPOrderBOMLine> list = new Query(getCtx(), MPPOrderBOMLine.Table_Name, whereClause, get_TrxName())
 										.setParameters(new Object[]{getPP_Order_ID()})
-										.setOrderBy(MPPOrderBOMLine.COLUMNNAME_Line)
+										//.setOrderBy(MPPOrderBOMLine.COLUMNNAME_Line)
+										.setOrderBy(MPPOrderBOMLine.COLUMNNAME_M_Locator_ID)
 										.list();
 		m_lines = list.toArray(new MPPOrderBOMLine[list.size()]);
 		return m_lines;
@@ -565,12 +573,12 @@ public class MPPOrder extends X_PP_Order implements DocAction
 		{
 			for (int i = 0; i < lines.length; i++)
 			{
-				if (lines[i].getM_Warehouse_ID() != getM_Warehouse_ID())
+				/*if (lines[i].getM_Warehouse_ID() != getM_Warehouse_ID())
 				{
 					log.warning("different Warehouse " + lines[i]);
 					m_processMsg = "@CannotChangeDocType@";
 					return DocAction.STATUS_Invalid;
-				}
+				}*/
 			}
 		}
 
@@ -603,6 +611,7 @@ public class MPPOrder extends X_PP_Order implements DocAction
 		return DocAction.STATUS_InProgress;
 	} //	prepareIt
 
+	@SuppressWarnings("deprecation")
 	private void orderStock()
 	{
 		MProduct product = getM_Product();
@@ -622,23 +631,35 @@ public class MPPOrder extends X_PP_Order implements DocAction
 		// Necessary to clear order quantities when called from closeIt - 4Layers
 		if (DOCACTION_Close.equals(getDocAction()))
 		{
-			if (!MStorageOnHand.add(getCtx(), getM_Warehouse_ID(), M_Locator_ID,
+			/*if (!MStorageOnHand.add(getCtx(), getM_Warehouse_ID(), M_Locator_ID,
 					getM_Product_ID(), getM_AttributeSetInstance_ID(), ordered, get_TrxName()))
 			{
 				throw new AdempiereException();
 			}
+			 */
+			
+			
 		}
-		else
+		/*else
 		{
+			
 			//	Update Storage
 			if (!MStorageOnHand.add(getCtx(), getM_Warehouse_ID(), M_Locator_ID,
 					getM_Product_ID(), getM_AttributeSetInstance_ID(), ordered, get_TrxName()))
 			{
 				throw new AdempiereException();
 			}
-		}
+			
+			
+		}*/
 
 		setQtyReserved(getQtyReserved().add(difference));
+		//		Update Reservation Storage
+		/*if (!MStorageReservation.add(getCtx(), getM_Warehouse_ID(), 
+			getM_Product_ID(), 
+			getM_AttributeSetInstance_ID(),
+			getQtyReserved().add(difference), false, get_TrxName()))
+			throw new AdempiereException();*/
 	}
 
 	/**
@@ -738,6 +759,44 @@ public class MPPOrder extends X_PP_Order implements DocAction
 		String whereClause = "QtyOnHand >= QtyRequired AND PP_Order_ID=?";
 		boolean available = new Query(getCtx(), "RV_PP_Order_Storage", whereClause, get_TrxName())
 										.setParameters(new Object[]{get_ID()})
+										.match();
+		return available;
+	}
+	
+	public boolean isProductWithOutQty(){
+		String whereClause = "isCritical = 'Y' AND PP_Order_ID=? AND (qtyrequired > qtyonhand or qtyonhand is NULL)";
+		boolean available = new Query(getCtx(), "RV_PP_Order_Storage", whereClause, get_TrxName())
+										.setParameters(new Object[]{get_ID()})
+										.match();
+		return available;
+	}
+	
+	public String crititalProductsWithOutInventory(int PP_Order_ID) {
+		String data = "";
+		String query = "SELECT p.name as product, p.value as code FROM RV_PP_Order_Storage as pos"
+				+" INNER JOIN M_Product as p ON p.m_product_id = pos.m_product_id"
+				+" WHERE isCritical = 'Y' AND PP_Order_ID=? AND (qtyrequired > qtyonhand or qtyonhand is NULL)";
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		
+		try {
+			pstmt = DB.prepareStatement(query, null);
+			pstmt.setInt(1, PP_Order_ID);
+			rs = pstmt.executeQuery();
+			while (rs.next()) {
+				data+=rs.getString("product")+" ("+rs.getString("code")+"), ";
+			}
+			DB.close(rs, pstmt);
+		} catch(SQLException e) {
+			throw new DBException(e);
+		}
+		return data;
+	}
+	
+	public boolean isProductWithInventory(int m_product_id, int pp_order_id) {
+		String whereClause = "m_product_id = ? AND PP_Order_ID=? AND QtyOnHand >= QtyRequired";
+		boolean available = new Query(getCtx(), "RV_PP_Order_Storage", whereClause, get_TrxName())
+										.setParameters(new Object[]{ m_product_id, pp_order_id })
 										.match();
 		return available;
 	}
@@ -1143,6 +1202,8 @@ public class MPPOrder extends X_PP_Order implements DocAction
 				obl.setM_Warehouse_ID(getM_Warehouse_ID());
 				obl.setM_Locator_ID(getM_Locator_ID());
 				obl.setQtyPlusScrap(parentQty);
+				obl.set_ValueOfColumn("IsRacking", PP_Product_BOMline.get_Value("IsRacking"));
+				obl.set_ValueOfColumn("IsDerivative", PP_Product_BOMline.get_Value("IsDerivative"));
 				obl.saveEx(get_TrxName()); 
 		 /*	DO NOT DO. LOW LEVEL requires each PP_Order to be handled separaete LEVEL to expand.
 				//iterate BOM children -- relegate to multiple PPOrder parent product tabs
@@ -1249,7 +1310,7 @@ public class MPPOrder extends X_PP_Order implements DocAction
 	 * @param movementdate
 	 * @param qty
 	 * @param qtyScrap
-	 * @param qtyReject
+	 * @param qtyRejectMovementDate
 	 * @param storages
 	 * @param force Issue
 	 */
@@ -1503,6 +1564,7 @@ public class MPPOrder extends X_PP_Order implements DocAction
 	{
 		MAcctSchema as = MClient.get(getCtx(), getAD_Client_ID()).getAcctSchema();
 		log.info("Cost_Group_ID" + as.getM_CostType_ID());
+		log.info("Entrando el crear el costo estandar");
 
 		final TreeSet<Integer> productsAdded = new TreeSet<Integer>();
 		

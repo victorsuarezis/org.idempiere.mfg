@@ -18,6 +18,7 @@ import org.adempiere.exceptions.DBException;
 import org.compiere.model.MLocator;
 import org.compiere.model.MProduct;
 import org.compiere.model.MStorageOnHand;
+import org.compiere.model.MStorageReservation;
 import org.compiere.model.MUOM;
 import org.compiere.model.MWarehouse;
 import org.compiere.model.Query;
@@ -511,13 +512,13 @@ public class MPPOrderBOMLine extends X_PP_Order_BOMLine
 		if (header_M_Warehouse_ID != 0) //	enforce WH
 		{
 			if (header_M_Warehouse_ID != getM_Warehouse_ID())
-				setM_Warehouse_ID(header_M_Warehouse_ID);
+				//setM_Warehouse_ID(header_M_Warehouse_ID);
 			if (getAD_Org_ID() != getAD_Org_ID())
 				setAD_Org_ID(getAD_Org_ID());
 		}
 		//
 		final BigDecimal target = getQtyRequired();
-		final BigDecimal difference = target.subtract(getQtyReserved()).subtract(getQtyDelivered());
+		final BigDecimal difference = target; //target.subtract(getQtyReserved()).subtract(getQtyDelivered());
 		log.info("Line=" + getLine() + " - Target=" + target + ",Difference=" + difference + " - Required=" + getQtyRequired()
 				+ ",Reserved=" + getQtyReserved() + ",Delivered=" + getQtyDelivered());
 		if (difference.signum() == 0)
