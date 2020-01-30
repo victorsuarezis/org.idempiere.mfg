@@ -323,7 +323,8 @@ public class OrderReceiptIssue extends GenForm {
 				+ "bomQtyAvailable(obl.M_Product_ID,obl.M_Warehouse_ID,0 ) AS QtyAvailable," // 10
 				+ "bomQtyOnHand(obl.M_Product_ID,obl.M_Warehouse_ID,0) AS QtyOnHand," // 11
 				+ "p.M_Locator_ID," // 12
-				+ "COALESCE(w2.M_Warehouse_ID, obl.M_Warehouse_ID) as M_Warehouse_ID,COALESCE(w2.name,w.Name) as name," // 13,14
+				+ "COALESCE((select w.M_Warehouse_ID from M_MovementLine as mvl inner join M_Movement as mv on mv.m_movement_id = mvl.m_movement_id inner join M_Locator as ml on (ml.m_locator_id = mvl.m_locator_id) inner join M_Warehouse as w on (w.M_Warehouse_ID = ml.m_warehouse_id) where mv.pp_order_id = obl.pp_order_id and mvl.m_product_id = obl.m_product_id), obl.M_Warehouse_ID) as M_Warehouse_ID," //13
+				+ "COALESCE((select w.name from M_MovementLine as mvl inner join M_Movement as mv on mv.m_movement_id = mvl.m_movement_id inner join M_Locator as ml on (ml.m_locator_id = mvl.m_locator_id) inner join M_Warehouse as w on (w.M_Warehouse_ID = ml.m_warehouse_id) where mv.pp_order_id = obl.pp_order_id and mvl.m_product_id = obl.m_product_id),w.Name) as name," //14
 				+ "obl.QtyBom," // 15
 				+ "obl.isQtyPercentage," // 16
 				+ "obl.QtyBatch," // 17
@@ -331,11 +332,6 @@ public class OrderReceiptIssue extends GenForm {
 				+ "obl.QtyRequired - obl.QtyDelivered AS QtyOpen," // 19
 				+ "obl.QtyDelivered" // 20
 				+ " FROM PP_Order_BOMLine obl"
-				+ " INNER JOIN PP_Order ppo on (ppo.pp_order_id = obl.pp_order_id)"
-				+ " INNER JOIN M_Movement as mov on (mov.pp_order_id = ppo.pp_order_id)"
-				+ " LEFT JOIN M_MovementLine as movl on (movl.m_movement_id = mov.m_movement_id and movl.m_product_id = obl.m_product_id)"
-				+ " LEFT JOIN M_Locator as ml on (ml.m_locator_id = movl.m_locatorto_id)"
-				+ " LEFT JOIN M_Warehouse as w2 on (w2.m_warehouse_id = ml.m_warehouse_id)"
 				+ " INNER JOIN M_Product p ON (obl.M_Product_ID = p.M_Product_ID) "
 				+ " INNER JOIN C_UOM u ON (p.C_UOM_ID = u.C_UOM_ID) "
 				+ " INNER JOIN M_Warehouse w ON (w.M_Warehouse_ID = obl.M_Warehouse_ID) "
