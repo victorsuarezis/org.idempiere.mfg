@@ -323,8 +323,8 @@ public class OrderReceiptIssue extends GenForm {
 				+ "bomQtyAvailable(obl.M_Product_ID,obl.M_Warehouse_ID,0 ) AS QtyAvailable," // 10
 				+ "bomQtyOnHand(obl.M_Product_ID,obl.M_Warehouse_ID,0) AS QtyOnHand," // 11
 				+ "p.M_Locator_ID," // 12
-				+ "COALESCE((select w.M_Warehouse_ID from M_MovementLine as mvl inner join M_Movement as mv on mv.m_movement_id = mvl.m_movement_id inner join M_Locator as ml on (ml.m_locator_id = mvl.m_locator_id) inner join M_Warehouse as w on (w.M_Warehouse_ID = ml.m_warehouse_id) where mv.pp_order_id = obl.pp_order_id and mvl.m_product_id = obl.m_product_id), obl.M_Warehouse_ID) as M_Warehouse_ID," //13
-				+ "COALESCE((select w.name from M_MovementLine as mvl inner join M_Movement as mv on mv.m_movement_id = mvl.m_movement_id inner join M_Locator as ml on (ml.m_locator_id = mvl.m_locator_id) inner join M_Warehouse as w on (w.M_Warehouse_ID = ml.m_warehouse_id) where mv.pp_order_id = obl.pp_order_id and mvl.m_product_id = obl.m_product_id),w.Name) as name," //14
+				+ "COALESCE((select w.M_Warehouse_ID from M_MovementLine as mvl inner join M_Movement as mv on mv.m_movement_id = mvl.m_movement_id inner join M_Locator as ml on (ml.m_locator_id = mvl.M_LocatorTo_ID) inner join M_Warehouse as w on (w.M_Warehouse_ID = ml.m_warehouse_id) where mv.pp_order_id = obl.pp_order_id and mvl.m_product_id = obl.m_product_id), obl.M_Warehouse_ID) as M_Warehouse_ID," //13
+				+ "COALESCE((select w.name from M_MovementLine as mvl inner join M_Movement as mv on mv.m_movement_id = mvl.m_movement_id inner join M_Locator as ml on (ml.m_locator_id = mvl.M_LocatorTo_ID) inner join M_Warehouse as w on (w.M_Warehouse_ID = ml.m_warehouse_id) where mv.pp_order_id = obl.pp_order_id and mvl.m_product_id = obl.m_product_id),w.Name) as name," //14
 				+ "obl.QtyBom," // 15
 				+ "obl.isQtyPercentage," // 16
 				+ "obl.QtyBatch," // 17
