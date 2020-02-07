@@ -177,6 +177,28 @@ public class OrderReceiptIssue extends GenForm {
 				+ " WHERE obl.PP_Order_ID = ?" + " ORDER BY obl."
 				+ MPPOrderBOMLine.COLUMNNAME_Line;
 	} // dynInit
+	
+	private int getWarehouseIDByOrgAndName(int Org_ID, String WarehouseName) {
+		int Warehouse = 0;
+		String Sql = "SELECT M_Warehouse_ID FROM M_Warehouse WHERE ad_org_id = ? and name = ?";
+		
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		
+		try {
+			pstmt = DB.prepareStatement(Sql, null);
+			pstmt.setInt(1, Org_ID);
+			pstmt.setString(2, WarehouseName);
+			rs = pstmt.executeQuery();
+			if (rs.next()) {
+				Warehouse = rs.getInt("M_Warehouse_ID");
+			}
+			pstmt.close();
+		} catch(Exception e) {
+			log.fine("Error to get data from M_Warehouse Table");
+		}
+		return Warehouse;
+	}
 
 	private String createHTMLTable(String[][] table) {
 		StringBuffer html = new StringBuffer(
@@ -249,6 +271,7 @@ public class OrderReceiptIssue extends GenForm {
 			data.add(issue.getValueAt(i, 3)); // 3 - KeyNamePair Product
 			data.add(getValueBigDecimal(issue, i, 8)); // 4 - QtyToDeliver
 			data.add(getValueBigDecimal(issue, i, 9)); // 5 - QtyScrapComponent
+			data.add(this.getWarehouseIDByOrgAndName(order.getAD_Org_ID(), issue.getValueAt(i, 14).toString())); //6 M_Warehouse_ID
 			m_issue[row][0] = data;
 			row++;
 		}
@@ -271,6 +294,7 @@ public class OrderReceiptIssue extends GenForm {
 			MPPOrderBOMLine orderbomLine = null;
 			int PP_Order_BOMLine_ID = 0;
 			int M_AttributeSetInstance_ID = 0;
+			int M_Warehouse_id = (int) m_issue[i][0].get(6);
 
 			BigDecimal qtyToDeliver = (BigDecimal) m_issue[i][0].get(4);
 			BigDecimal qtyScrapComponent = (BigDecimal) m_issue[i][0].get(5);
@@ -297,7 +321,7 @@ public class OrderReceiptIssue extends GenForm {
 				}
 
 				MStorageOnHand[] storages = MPPOrder.getStorages(Env.getCtx(),
-						M_Product_ID, order.getM_Warehouse_ID(),
+						M_Product_ID, M_Warehouse_id,
 						M_AttributeSetInstance_ID, minGuaranteeDate,
 						order.get_TrxName());
 
@@ -320,11 +344,11 @@ public class OrderReceiptIssue extends GenForm {
 				+ "p.C_UOM_ID,u.Name," // 6,7
 				+ "obl.QtyRequired," // 8
 				+ "obl.QtyReserved," // 9
-				+ "bomQtyAvailable(obl.M_Product_ID,COALESCE(w2.M_Warehouse_ID, obl.M_Warehouse_ID),0 ) AS QtyAvailable," // 10
-				+ "bomQtyOnHand(obl.M_Product_ID,COALESCE(w2.M_Warehouse_ID, obl.M_Warehouse_ID),0) AS QtyOnHand," // 11
+				+ "bomQtyAvailable(obl.M_Product_ID,obl.M_Warehouse_ID,0 ) AS QtyAvailable," // 10
+				+ "bomQtyOnHand(obl.M_Product_ID,obl.M_Warehouse_ID,0) AS QtyOnHand," // 11
 				+ "p.M_Locator_ID," // 12
-				+ "COALESCE(w2.M_Warehouse_ID, obl.M_Warehouse_ID) as M_Warehouse_ID," //13
-				+ "COALESCE(w2.name,w.Name) as name," //14
+				+ "obl.M_Warehouse_ID," //13
+				+ "w.Name," //14
 				+ "obl.QtyBom," // 15
 				+ "obl.isQtyPercentage," // 16
 				+ "obl.QtyBatch," // 17
@@ -335,7 +359,6 @@ public class OrderReceiptIssue extends GenForm {
 				+ " INNER JOIN M_Product p ON (obl.M_Product_ID = p.M_Product_ID) "
 				+ " INNER JOIN C_UOM u ON (p.C_UOM_ID = u.C_UOM_ID) "
 				+ " INNER JOIN M_Warehouse w ON (w.M_Warehouse_ID = obl.M_Warehouse_ID) "
-				+ " INNER JOIN M_Warehouse w2 on (w2.M_Warehouse_ID = COALESCE((select w.M_Warehouse_ID from M_MovementLine as mvl inner join M_Movement as mv on mv.m_movement_id = mvl.m_movement_id inner join M_Locator as ml on (ml.m_locator_id = mvl.M_LocatorTo_ID) inner join M_Warehouse as w on (w.M_Warehouse_ID = ml.m_warehouse_id) where mv.pp_order_id = obl.pp_order_id and mvl.m_product_id = obl.m_product_id), obl.M_Warehouse_ID))"
 				+ " WHERE obl.PP_Order_ID = ?" + " ORDER BY obl."
 				+ MPPOrderBOMLine.COLUMNNAME_Line;
 		// reset table

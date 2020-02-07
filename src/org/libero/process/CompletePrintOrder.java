@@ -52,7 +52,7 @@ implements ClientProcess
 	@SuppressWarnings("unused")
 	private boolean p_IsPrintPackList = false; // for future use
 	private boolean p_IsComplete = false;
-	private int p_M_LocatorTo_ID = 0;
+	//private int p_M_LocatorTo_ID = 0;
 	private int C_DocType_ID = 0;
 
 	/**
@@ -74,8 +74,8 @@ implements ClientProcess
 				p_IsPrintPackList = para.getParameterAsBoolean();
 			else if (name.equals("IsComplete"))
 				p_IsComplete = para.getParameterAsBoolean(); 
-			else if (name.equals("M_LocatorTo_ID"))
-				p_M_LocatorTo_ID = para.getParameterAsInt();
+			/*else if (name.equals("M_LocatorTo_ID"))
+				p_M_LocatorTo_ID = para.getParameterAsInt();*/
 			else if (name.equals("C_DocType_ID"))
 				C_DocType_ID = para.getParameterAsInt();
 			else
@@ -154,8 +154,8 @@ implements ClientProcess
 								m_movement_line.setAD_Org_ID(line.getAD_Org_ID());
 								m_movement_line.setLine(line.getLine());
 								m_movement_line.setM_Product_ID(line.getM_Product_ID());
-								m_movement_line.setM_Locator_ID(line.getM_Locator_ID());
-								m_movement_line.setM_LocatorTo_ID(p_M_LocatorTo_ID);
+								//m_movement_line.setM_Locator_ID(line.getM_Locator_ID());
+								m_movement_line.setM_LocatorTo_ID(line.getM_Locator_ID());
 								m_movement_line.setMovementQty(line.getQtyRequired());
 								m_movement_line.saveEx(get_TrxName());
 								
@@ -165,9 +165,8 @@ implements ClientProcess
 								m_movement_line.setAD_Org_ID(line.getAD_Org_ID());
 								m_movement_line.setLine(line.getLine());
 								m_movement_line.setM_Product_ID(line.getM_Product_ID());
-								m_movement_line.setM_Locator_ID(line.getM_Locator_ID());
-								m_movement_line.setM_LocatorTo_ID(p_M_LocatorTo_ID);
-								System.out.println("Localizador: "+line.getM_Locator_ID());
+								//m_movement_line.setM_Locator_ID(line.getM_Locator_ID());
+								m_movement_line.setM_LocatorTo_ID(line.getM_Locator_ID());
 								m_movement_line.setMovementQty(line.getQtyRequired());
 								m_movement_line.saveEx(get_TrxName());	
 							}

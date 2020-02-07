@@ -921,7 +921,7 @@ ValueChangeListener,Serializable,WTableModelListener
 							 mpl.setAD_Org_ID(line.getAD_Client_ID());
 							 mpl.setLine(line.getLine());
 							 mpl.setM_Product_ID(line.getM_Product_ID());
-							 if(line.get_ValueAsBoolean("IsDerivatite")) {
+							 if(line.get_ValueAsBoolean("IsDerivative")) {
 								 mpl.setIsEndProduct(true);
 								 mpl.setMovementQty(line.getQtyRequired().abs());
 							 }else {
@@ -944,10 +944,10 @@ ValueChangeListener,Serializable,WTableModelListener
 						 mpl1.setM_Locator_ID(order.getM_Locator_ID());
 						 mpl1.saveEx(production.get_TrxName());
 						 
+						 production.setIsUseProductionPlan(true);
 						 if(!production.processIt(MProduction.DOCACTION_Complete)) {
 							 throw new AdempiereException(production.getProcessMsg());
 						 }
-
 						 production.saveEx(order.get_TrxName());
 						
 					}
