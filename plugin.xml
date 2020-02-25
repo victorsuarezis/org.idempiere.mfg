@@ -164,6 +164,11 @@
             tableName="PP_Order">
       </callout>
       <callout
+            class="org.libero.callouts.Callout_PP_Order"
+            columnName="C_DocTypeTarget_ID"
+            tableName="PP_Order">
+      </callout>
+      <callout
             class="org.libero.callouts.Callout_DD_OrderLine"
             columnName="M_Product_ID"
             tableName="DD_OrderLine">

@@ -57,6 +57,11 @@ public class CostEngine
 		return MCostElement.COSTINGMETHOD_StandardCosting;
 	}
 	
+	public String getCostingMethodAI()
+	{
+		return MCostElement.COSTINGMETHOD_AverageInvoice;
+	}
+	
 	public BigDecimal getResourceStandardCostRate(MPPCostCollector cc, int S_Resource_ID, CostDimension d, String trxName)
 	{
 		final MProduct resourceProduct = MProduct.forS_Resource_ID(Env.getCtx(), S_Resource_ID, null);
@@ -187,7 +192,7 @@ public class CostEngine
 			final MProduct product = MProduct.get(mtrx.getCtx(), mtrx.getM_Product_ID());
 			final String costingMethod = product.getCostingMethod(as);
 			// Check costing method
-			if (!getCostingMethod().equals(costingMethod))
+			if (!getCostingMethod().equals(costingMethod) && !getCostingMethodAI().equals(costingMethod))
 			{
 				throw new AdempiereException("Costing method not supported - "+costingMethod);
 			}

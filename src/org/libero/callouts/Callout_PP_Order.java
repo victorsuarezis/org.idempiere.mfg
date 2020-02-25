@@ -17,6 +17,9 @@ public class Callout_PP_Order extends CalloutOrder implements IColumnCallout {
 		}
 		if (mField.getColumnName().equals("M_Product_ID"))
 			return product(ctx, WindowNo, mTab, mField,value);
+		
+		if (mField.getColumnName().equals("C_DocTypeTarget_ID"))
+			return doctype(ctx, WindowNo, mTab, mField,value);
 		return null;
 	}
 

@@ -15,6 +15,8 @@ import org.eevolution.model.MPPProductBOMLine;
 import org.eevolution.model.MPPProductPlanning;
 import org.libero.model.*;
 
+import net.frontuari.model.FTUMProduction;
+
 public class MFG_ModelFactory implements IModelFactory {
 
 	@Override
@@ -92,6 +94,8 @@ public class MFG_ModelFactory implements IModelFactory {
 			     return MOrder.class;
 		   } else if (tableName.equals(LiberoMovementLine.Table_Name)){
 			   return LiberoMovementLine.class;
+		   } else if (tableName.equals(FTUMProduction.Table_Name)){
+			   return FTUMProduction.class;
 		   } else 	   
 			   return null;
 	}
@@ -174,6 +178,8 @@ public class MFG_ModelFactory implements IModelFactory {
 			     return new MOrder(Env.getCtx(), Record_ID, trxName);
 		   }else if (tableName.equals(LiberoMovementLine.Table_Name)){
 			   return new LiberoMovementLine(Env.getCtx(), Record_ID, trxName);
+		   }else if (tableName.equals(FTUMProduction.Table_Name)){
+			   return new FTUMProduction(Env.getCtx(), Record_ID, trxName);
 		   }
 		   return null;
 	}
@@ -257,7 +263,9 @@ public class MFG_ModelFactory implements IModelFactory {
 
 		   } else if (tableName.equals(MOrder.Table_Name)) {
 			     return new MOrder(Env.getCtx(), rs, trxName);
-
+		   } 
+		   else if (tableName.equals(FTUMProduction.Table_Name)) {
+			     return new FTUMProduction(Env.getCtx(), rs, trxName);
 		   }
 		   return null;
 	}

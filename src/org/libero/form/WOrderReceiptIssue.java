@@ -23,7 +23,6 @@ import java.sql.Timestamp;
 import java.util.Properties;
 
 import org.adempiere.exceptions.AdempiereException;
-import org.adempiere.util.Callback;
 import org.adempiere.webui.component.Button;
 import org.adempiere.webui.component.Combobox;
 import org.adempiere.webui.component.Grid;
@@ -50,7 +49,6 @@ import org.adempiere.webui.panel.ADForm;
 import org.adempiere.webui.panel.CustomForm;
 import org.adempiere.webui.panel.IFormController;
 import org.adempiere.webui.session.SessionManager;
-import org.adempiere.webui.window.FDialog;
 import org.compiere.minigrid.IMiniTable;
 import org.compiere.model.GridField;
 import org.compiere.model.GridFieldVO;
@@ -60,8 +58,6 @@ import org.compiere.model.MLocatorLookup;
 import org.compiere.model.MLookup;
 import org.compiere.model.MLookupFactory;
 import org.compiere.model.MProduct;
-import org.compiere.model.MProduction;
-import org.compiere.model.MProductionLine;
 import org.compiere.model.MTab;
 import org.compiere.model.MWindow;
 import org.compiere.util.DisplayType;
@@ -482,7 +478,7 @@ ValueChangeListener,Serializable,WTableModelListener
 
 				if (cmd_process(isCloseDocument, issue))
 				{
-					dispose();
+					//dispose();
 					return;
 				}
 				//Clients.showBusy(TabsReceiptsIssue, null);
@@ -593,7 +589,7 @@ ValueChangeListener,Serializable,WTableModelListener
 				//Default ASI defined from the Parent BOM Order
 				setM_AttributeSetInstance_ID(pp_order.getM_Product().getM_AttributeSetInstance_ID());
 				pickcombo.setSelectedIndex(0);  //default to first entry - isBackflush
-				Event ev = new Event(Events.ON_CHANGE,pickcombo);
+				Event ev = new Event(Events.ON_CHANGE,pickcombo);				
 				try {
 					onEvent(ev);
 				} catch (Exception e1) {					
@@ -899,57 +895,16 @@ ValueChangeListener,Serializable,WTableModelListener
 					MPPOrder order = new MPPOrder(Env.getCtx(), getPP_Order_ID(), trxName);
 					if (isBackflush() || isOnlyIssue()) 
 					{
-						createIssue(order, issue);
-						//Create the production
-						MProduction production = new MProduction(Env.getCtx(), 0, trxName);
-						
-						production.setAD_Org_ID(order.getAD_Client_ID());
-						production.setM_Product_ID(order.getM_Product_ID());
-						production.setDatePromised(order.getDatePromised());
-						production.setMovementDate(new Timestamp(System.currentTimeMillis()));
-						production.setM_Locator_ID(order.getM_Locator_ID());
-						production.setProductionQty(order.getQtyEntered());
-						production.setIsCreated("Y");
-						production.set_ValueOfColumn("PP_Order_ID", order.get_ID());
-						production.saveEx(production.get_TrxName());
-						
-						int lineNumber = 10;
-						
-						 for(MPPOrderBOMLine line: order.getLines()) {
-							 
-							 MProductionLine mpl = new MProductionLine(production);
-							 mpl.setAD_Org_ID(line.getAD_Client_ID());
-							 mpl.setLine(line.getLine());
-							 mpl.setM_Product_ID(line.getM_Product_ID());
-							 if(line.get_ValueAsBoolean("IsDerivative")) {
-								 mpl.setIsEndProduct(true);
-								 mpl.setMovementQty(line.getQtyRequired().abs());
-							 }else {
-								 mpl.setIsEndProduct(false);
-							 }
-							 mpl.setQtyUsed(line.getQtyRequired());
-							 mpl.setM_Locator_ID(line.getM_Locator_ID());
-							 mpl.saveEx(production.get_TrxName());
-							 
-							 lineNumber = lineNumber + 10;
-						 }
-
-						 MProductionLine mpl1 = new MProductionLine(production);
-						 mpl1.setAD_Org_ID(order.getAD_Client_ID());
-						 mpl1.setLine(lineNumber);
-						 mpl1.setM_Product_ID(order.getM_Product_ID());
-						 mpl1.setIsEndProduct(true);
-						 mpl1.setMovementQty(order.getQtyOrdered().abs());
-						 mpl1.setQtyUsed(order.getQtyOrdered());
-						 mpl1.setM_Locator_ID(order.getM_Locator_ID());
-						 mpl1.saveEx(production.get_TrxName());
-						 
-						 production.setIsUseProductionPlan(true);
-						 if(!production.processIt(MProduction.DOCACTION_Complete)) {
-							 throw new AdempiereException(production.getProcessMsg());
-						 }
-						 production.saveEx(order.get_TrxName());
-						
+						//createIssue(order, issue);
+						// Added by Jorge Colmenarez 2020-02-24 18:55, create production document
+						try {
+							createProduction(order,issue,getM_Locator_ID(),getToDeliverQty(),trxName);
+						}
+						catch(Exception e) {
+							showMessage(e.getLocalizedMessage(), true);
+							throw new AdempiereException(e.getLocalizedMessage());
+						}
+						// End Jorge Colmenarez
 					}
 					if (isOnlyReceipt() || isBackflush()) 
 					{

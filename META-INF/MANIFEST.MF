@@ -39,6 +39,7 @@ Import-Package: junit.extensions,
  org.zkoss.util
 Export-Package: junit.extensions,
  junit.framework,
+ net.frontuari.model,
  org.idempiere.component,
  org.libero.exceptions,
  org.libero.form.crp,

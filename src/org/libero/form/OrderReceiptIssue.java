@@ -25,12 +25,14 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 
+import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.exceptions.DBException;
 import org.compiere.apps.form.GenForm;
 import org.compiere.minigrid.IDColumn;
 import org.compiere.minigrid.IMiniTable;
 import org.compiere.model.MAttributeSetInstance;
 import org.compiere.model.MProduct;
+import org.compiere.model.MProductionLine;
 import org.compiere.model.MStorageOnHand;
 import org.compiere.util.CLogger;
 import org.compiere.util.DB;
@@ -39,6 +41,9 @@ import org.compiere.util.KeyNamePair;
 import org.compiere.util.Msg;
 import org.libero.model.MPPOrder;
 import org.libero.model.MPPOrderBOMLine;
+
+import net.frontuari.model.FTUMProduction;
+
 import org.eevolution.model.MPPProductBOMLine;
 
 /**
@@ -133,7 +138,7 @@ public class OrderReceiptIssue extends GenForm {
 				Msg.translate(Env.getCtx(), "QtyReserved"));
 		issue.setColumnClass(12, BigDecimal.class, true,
 				Msg.translate(Env.getCtx(), "QtyAvailable"));
-		issue.setColumnClass(13, String.class, true,
+		issue.setColumnClass(13, KeyNamePair.class, true,
 				Msg.translate(Env.getCtx(), "M_Locator_ID"));
 		issue.setColumnClass(14, KeyNamePair.class, true,
 				Msg.translate(Env.getCtx(), "M_Warehouse_ID"));
@@ -159,21 +164,24 @@ public class OrderReceiptIssue extends GenForm {
 				+ "obl.M_Product_ID,p.Name," // 4,5
 				+ "p.C_UOM_ID,u.Name," // 6,7
 				+ "obl.QtyRequired," // 8
-				+ "obl.QtyReserved," // 9
+				//+ "obl.QtyReserved," // 9
+				+ "ppbomqtyreserved(obl.M_Product_ID,obl.M_Warehouse_ID,0::numeric ) AS QtyReserved," // 9
 				+ "bomQtyAvailable(obl.M_Product_ID,obl.M_Warehouse_ID,0 ) AS QtyAvailable," // 10
 				+ "bomQtyOnHand(obl.M_Product_ID,obl.M_Warehouse_ID,0) AS QtyOnHand," // 11
-				+ "p.M_Locator_ID," // 12
+				+ "obl.M_Locator_ID, " // 12
 				+ "obl.M_Warehouse_ID,w.Name," // 13,14
 				+ "obl.QtyBom," // 15
 				+ "obl.isQtyPercentage," // 16
 				+ "obl.QtyBatch," // 17
 				+ "obl.ComponentType," // 18
 				+ "obl.QtyRequired - QtyDelivered AS QtyOpen," // 19
-				+ "obl.QtyDelivered" // 20
+				+ "obl.QtyDelivered" // 20 
+				+ ",l.Value AS LocatorValue " // 21
 				+ " FROM PP_Order_BOMLine obl"
 				+ " INNER JOIN M_Product p ON (obl.M_Product_ID = p.M_Product_ID) "
 				+ " INNER JOIN C_UOM u ON (p.C_UOM_ID = u.C_UOM_ID) "
 				+ " INNER JOIN M_Warehouse w ON (w.M_Warehouse_ID = obl.M_Warehouse_ID) "
+				+ " INNER JOIN M_Locator l ON (l.M_Locator_ID = obl.M_Locator_ID) "
 				+ " WHERE obl.PP_Order_ID = ?" + " ORDER BY obl."
 				+ MPPOrderBOMLine.COLUMNNAME_Line;
 	} // dynInit
@@ -343,10 +351,11 @@ public class OrderReceiptIssue extends GenForm {
 				+ "obl.M_Product_ID,p.Name," // 4,5
 				+ "p.C_UOM_ID,u.Name," // 6,7
 				+ "obl.QtyRequired," // 8
-				+ "obl.QtyReserved," // 9
+				//+ "obl.QtyReserved," // 9
+				+ "ppbomqtyreserved(obl.M_Product_ID,obl.M_Warehouse_ID,0::numeric) AS QtyReserved," // 9
 				+ "bomQtyAvailable(obl.M_Product_ID,obl.M_Warehouse_ID,0 ) AS QtyAvailable," // 10
 				+ "bomQtyOnHand(obl.M_Product_ID,obl.M_Warehouse_ID,0) AS QtyOnHand," // 11
-				+ "p.M_Locator_ID," // 12
+				+ "obl.M_Locator_ID," // 12
 				+ "obl.M_Warehouse_ID," //13
 				+ "w.Name," //14
 				+ "obl.QtyBom," // 15
@@ -355,10 +364,12 @@ public class OrderReceiptIssue extends GenForm {
 				+ "obl.ComponentType," // 18
 				+ "obl.QtyRequired - obl.QtyDelivered AS QtyOpen," // 19
 				+ "obl.QtyDelivered" // 20
+				+ ",l.Value AS LocatorValue " // 21
 				+ " FROM PP_Order_BOMLine obl"
 				+ " INNER JOIN M_Product p ON (obl.M_Product_ID = p.M_Product_ID) "
 				+ " INNER JOIN C_UOM u ON (p.C_UOM_ID = u.C_UOM_ID) "
 				+ " INNER JOIN M_Warehouse w ON (w.M_Warehouse_ID = obl.M_Warehouse_ID) "
+				+ " INNER JOIN M_Locator l ON (l.M_Locator_ID = obl.M_Locator_ID) "
 				+ " WHERE obl.PP_Order_ID = ?" + " ORDER BY obl."
 				+ MPPOrderBOMLine.COLUMNNAME_Line;
 		// reset table
@@ -413,6 +424,10 @@ public class OrderReceiptIssue extends GenForm {
 				issue.setValueAt(rs.getBigDecimal(9), row, 11); // QtyReserved
 				issue.setValueAt(rs.getBigDecimal(10), row, 12); // QtyAvailable
 				// ... 13 - M_Locator_ID
+				issue.setValueAt(
+						new KeyNamePair(rs.getInt(12), rs.getString(21)), row,
+						13); 
+				// Warehouse
 				issue.setValueAt(
 						new KeyNamePair(rs.getInt(13), rs.getString(14)), row,
 						14); // Warehouse
@@ -783,7 +798,7 @@ public class OrderReceiptIssue extends GenForm {
 
 		final String sql = "SELECT "
 				+ "s.M_Product_ID , s.QtyOnHand, s.M_AttributeSetInstance_ID"
-				+ ", p.Name, masi.Description, l.Value, w.Value, w.M_warehouse_ID,p.Value"
+				+ ", p.Name, masi.Description, l.Value, w.Value, w.M_warehouse_ID,p.Value,s.M_Locator_ID"
 				+ "  FROM M_Storage s "
 				+ " INNER JOIN M_Product p ON (s.M_Product_ID = p.M_Product_ID) "
 				+ " INNER JOIN C_UOM u ON (u.C_UOM_ID = p.C_UOM_ID) "
@@ -821,7 +836,10 @@ public class OrderReceiptIssue extends GenForm {
 				// ASI
 				issue.setValueAt(rs.getString(5), row, 5);
 				// Locator
-				issue.setValueAt(rs.getString(6), row, 13);
+				//issue.setValueAt(rs.getString(6), row, 13);
+				KeyNamePair m_locatorkey = new KeyNamePair(rs.getInt(10),
+						rs.getString(6));
+				issue.setValueAt(m_locatorkey, row, 13);
 				// Warehouse
 				KeyNamePair m_warehousekey = new KeyNamePair(rs.getInt(8),
 						rs.getString(7));
@@ -941,6 +959,103 @@ public class OrderReceiptIssue extends GenForm {
 	}
 
 	public void showMessage(String message, boolean error) {
+	}
+	
+	public void createProduction(MPPOrder order, IMiniTable issue, int LocatorID, BigDecimal qty, String trxName)
+	{
+		// Create the production
+		FTUMProduction production = new FTUMProduction(Env.getCtx(), 0, trxName);
+			
+		production.setAD_Org_ID(order.getAD_Org_ID());
+		production.setM_Product_ID(order.getM_Product_ID());
+		production.setDatePromised(order.getDatePromised());
+		production.setMovementDate(new Timestamp(System.currentTimeMillis()));
+		production.setM_Locator_ID(LocatorID);
+		production.setProductionQty(qty);
+		production.setIsCreated("Y");
+		production.set_ValueOfColumn("PP_Order_ID", order.get_ID());
+		production.setName(Msg.translate(Env.getCtx(),"Created")+" "+Msg.translate(Env.getCtx(),"From")+" ["+Msg.translate(Env.getCtx(), "PP_Order_ID")+": "+order.getDocumentNo()+"]");
+		production.setC_Project_ID(order.getC_Project_ID());
+		production.setC_Activity_ID(order.getC_Activity_ID());
+		production.setC_Campaign_ID(order.getC_Campaign_ID());
+		production.setAD_OrgTrx_ID(order.getAD_OrgTrx_ID());
+		production.setUser1_ID(order.getUser1_ID());
+		production.setUser2_ID(order.getUser2_ID());
+		production.setIsUseProductionPlan(false);
+		production.saveEx(trxName);
+		
+		int lineNumber = 10;
+		
+		MProductionLine mpl1 = new MProductionLine(production);
+		 mpl1.setAD_Org_ID(order.getAD_Org_ID());
+		 mpl1.setLine(lineNumber);
+		 mpl1.setM_Product_ID(order.getM_Product_ID());
+		 mpl1.setIsEndProduct(true);
+		 mpl1.setPlannedQty(order.getQtyEntered());
+		 mpl1.setMovementQty(qty);
+		 mpl1.setM_Locator_ID(LocatorID);
+		 mpl1.saveEx(trxName);
+		 
+		 lineNumber = lineNumber + 10;
+		 
+		 ArrayList[][] m_issue = new ArrayList[issue.getRowCount()][1];
+		 
+		 int row = 0;
+		// Check Available On Hand Qty
+		for (int i = 0; i < issue.getRowCount(); i++) {
+			ArrayList<Object> data = new ArrayList<Object>();
+			IDColumn id = (IDColumn) issue.getValueAt(i, 0);
+			KeyNamePair key = new KeyNamePair(id.getRecord_ID(),
+					id.isSelected() ? "Y" : "N");
+			data.add(key); // 0 - ID
+			data.add(issue.getValueAt(i, 1)); // 1 - IsCritical
+			data.add(issue.getValueAt(i, 2)); // 2 - Value
+			data.add(issue.getValueAt(i, 3)); // 3 - KeyNamePair Product
+			data.add(getValueBigDecimal(issue, i, 8)); // 4 - QtyToDeliver
+			data.add(getValueBigDecimal(issue, i, 9)); // 5 - QtyScrapComponent
+			data.add(this.getWarehouseIDByOrgAndName(order.getAD_Org_ID(), issue.getValueAt(i, 14).toString())); //6 M_Warehouse_ID
+			data.add(issue.getValueAt(i, 13)); // 7 - KeyNamePair M_Locator_ID
+			m_issue[row][0] = data;
+			row++;
+		}
+		 
+		 for (int i = 0; i < m_issue.length; i++) {
+				KeyNamePair key = (KeyNamePair) m_issue[i][0].get(0);
+				boolean isSelected = key.getName().equals("Y");
+				if (key == null || !isSelected) {
+					continue;
+				}
+
+				KeyNamePair productkey = (KeyNamePair) m_issue[i][0].get(3);
+				int productID = productkey.getKey();
+				KeyNamePair locatorkey = (KeyNamePair) m_issue[i][0].get(7);
+				int locatorID = locatorkey.getKey();
+				BigDecimal qtyLine = (BigDecimal) m_issue[i][0].get(4);
+				//	Only one record
+				MPPOrderBOMLine[] lines = order.getLines(true,"M_Product_ID = "+productID);
+				
+				MProductionLine mpl = new MProductionLine(production);
+				 mpl.setAD_Org_ID(order.getAD_Org_ID());
+				 mpl.setLine(lineNumber);
+				 mpl.setM_Product_ID(productID);
+				 mpl.setM_Locator_ID(locatorID);
+				 mpl.setPlannedQty(lines[0].getQtyEntered());
+				 if(lines[0].get_ValueAsBoolean("IsDerivative")) {
+					 mpl.setIsEndProduct(true);
+					 mpl.setMovementQty(qtyLine);
+				 }else {
+					 mpl.setIsEndProduct(false);
+					 mpl.setQtyUsed(qtyLine);
+				 }
+				 mpl.saveEx(trxName);
+				 
+				 lineNumber = lineNumber + 10;
+		 }
+		 
+		 if(!production.processIt(FTUMProduction.DOCACTION_Complete)) {
+			 throw new AdempiereException(production.getProcessMsg());
+		 }
+		 production.saveEx(trxName);
 	}
 
 }

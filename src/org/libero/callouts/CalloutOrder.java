@@ -23,6 +23,7 @@ import org.adempiere.model.GridTabWrapper;
 import org.compiere.model.CalloutEngine;
 import org.compiere.model.GridField;
 import org.compiere.model.GridTab;
+import org.compiere.model.MDocType;
 import org.compiere.model.MProduct;
 import org.compiere.model.MUOMConversion;
 import org.compiere.util.Env;
@@ -154,6 +155,18 @@ public class CalloutOrder extends CalloutEngine
 		}
 		
 		MPPOrder.updateQtyBatchs(ctx, order, true);
+		
+		return "";
+	}
+	
+	public String doctype (Properties ctx, int WindowNo, GridTab mTab, GridField mField, Object value)
+	{
+		if (isCalloutActive())
+			return "";
+		
+		I_PP_Order order = GridTabWrapper.create(mTab, I_PP_Order.class);
+		MDocType dt = new MDocType(ctx, order.getC_DocTypeTarget_ID(), null);
+		mTab.setValue("IsMovementAutomatic", dt.get_Value("IsMovementAutomatic"));
 		
 		return "";
 	}

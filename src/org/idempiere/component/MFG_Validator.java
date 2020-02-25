@@ -34,6 +34,7 @@ import org.compiere.model.MProduct;
 import org.compiere.model.MRMALine;
 import org.compiere.model.MRequisition;
 import org.compiere.model.MRequisitionLine;
+import org.compiere.model.MStorageReservation;
 import org.compiere.model.MWarehouse;
 import org.compiere.model.PO;
 import org.compiere.model.Query;
@@ -322,6 +323,35 @@ public class MFG_Validator extends AbstractEventHandler {
 			{
 				logEvent(event, po, type);//
 				MMovement move = (MMovement)po;
+				//	Added by Jorge Colmenarez 2020-02-24 17:29 
+				//	support for unreserve qty
+				int pporder = move.get_ValueAsInt("PP_Order_ID");
+				if(pporder > 0)
+				{
+					MPPOrder order = new MPPOrder(move.getCtx(), pporder, move.get_TrxName());
+					if(order.get_ValueAsBoolean("IsMovementAutomatic"))
+					{
+						//	Unreserve inventory
+						for (MMovementLine line : move.getLines(false))
+						{
+							boolean rsv1 = MStorageReservation.add(move.getCtx(), line.getM_Locator().getM_Warehouse_ID(), line.getM_Product_ID(), 
+									line.getM_AttributeSetInstance_ID(), line.getMovementQty().negate(), true, move.get_TrxName());
+							boolean rsv2 = MStorageReservation.add(move.getCtx(), line.getM_LocatorTo().getM_Warehouse_ID(), line.getM_Product_ID(), 
+									line.getM_AttributeSetInstance_ID(), line.getMovementQty().negate(), false, move.get_TrxName());
+							if(!rsv1 || !rsv2)
+							{
+								throw new AdempiereException("Storage reserve Update Error!");
+							}
+						}
+						for (MPPOrderBOMLine line: order.getLines())
+						{
+							line.setQtyReserved(line.getQtyReserved().negate());
+							line.saveEx(move.get_TrxName());
+						}
+					}
+				}
+				// End Jorge Colmenarez
+				
 				for (MMovementLine line : move.getLines(false))
 				{
 					if(line.getDD_OrderLine_ID() > 0)

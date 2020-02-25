@@ -23,7 +23,6 @@ import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.exceptions.DBException;
 import org.adempiere.exceptions.DocTypeNotFoundException;
 import org.adempiere.model.engines.CostDimension;
-import org.compiere.acct.Doc_InOut;
 import org.compiere.model.MAcctSchema;
 import org.compiere.model.MClient;
 import org.compiere.model.MCost;
@@ -32,8 +31,6 @@ import org.compiere.model.MLocator;
 import org.compiere.model.MOrder;
 import org.compiere.model.MOrderLine;
 import org.compiere.model.MProduct;
-import org.compiere.model.MProduction;
-import org.compiere.model.MProductionLine;
 import org.compiere.model.MProject;
 import org.compiere.model.MResource;
 import org.compiere.model.MStorageOnHand;
@@ -360,6 +357,34 @@ public class MPPOrder extends X_PP_Order implements DocAction
 		m_lines = list.toArray(new MPPOrderBOMLine[list.size()]);
 		return m_lines;
 	}
+	
+	/**
+	 * Get BOM Lines of PP Order
+	 * @param requery
+	 * @return Order BOM Lines
+	 */
+	public MPPOrderBOMLine[] getLines(boolean requery, String whereClause)
+	{
+		if (m_lines != null && !requery)
+		{
+			set_TrxName(m_lines, get_TrxName());
+			return m_lines;
+		}
+		if(whereClause.isEmpty())
+			whereClause = MPPOrderBOMLine.COLUMNNAME_PP_Order_ID+"=?"; 
+		else {
+			whereClause += " AND "+MPPOrderBOMLine.COLUMNNAME_PP_Order_ID+"=?";
+		}
+			
+		List<MPPOrderBOMLine> list = new Query(getCtx(), MPPOrderBOMLine.Table_Name, whereClause, get_TrxName())
+										.setParameters(new Object[]{getPP_Order_ID()})
+										//.setOrderBy(MPPOrderBOMLine.COLUMNNAME_Line)
+										.setOrderBy(MPPOrderBOMLine.COLUMNNAME_M_Locator_ID)
+										.list();
+		m_lines = list.toArray(new MPPOrderBOMLine[list.size()]);
+		return m_lines;
+	}
+	
 	private MPPOrderBOMLine[] m_lines = null;
 
 	/**
@@ -437,8 +462,9 @@ public class MPPOrder extends X_PP_Order implements DocAction
 		}
 		
 		// Order Stock
-		if( is_ValueChanged(MPPOrder.COLUMNNAME_QtyDelivered)
-				|| is_ValueChanged(MPPOrder.COLUMNNAME_QtyOrdered))
+		if( (is_ValueChanged(MPPOrder.COLUMNNAME_QtyDelivered)
+				|| is_ValueChanged(MPPOrder.COLUMNNAME_QtyOrdered)) 
+				&& !getDocStatus().equals(MPPOrder.DOCSTATUS_Drafted))
 		{	
 			orderStock();
 		}
@@ -573,12 +599,16 @@ public class MPPOrder extends X_PP_Order implements DocAction
 		{
 			for (int i = 0; i < lines.length; i++)
 			{
-				/*if (lines[i].getM_Warehouse_ID() != getM_Warehouse_ID())
+				// Added by Jorge Colmenarez 2020-02-24 11:49 
+				// Validate when Warehouse it's different and product not is racking 
+				if (lines[i].getM_Warehouse_ID() != getM_Warehouse_ID() 
+						&& !lines[i].get_ValueAsBoolean("IsRacking"))
+				// End Jorge Colmenarez
 				{
 					log.warning("different Warehouse " + lines[i]);
-					m_processMsg = "@CannotChangeDocType@";
+					m_processMsg = "@CannotChangeWarehouse@";
 					return DocAction.STATUS_Invalid;
-				}*/
+				}
 			}
 		}
 
@@ -602,6 +632,8 @@ public class MPPOrder extends X_PP_Order implements DocAction
 			reserveStock(lines);
 			orderStock();
 		}
+		
+		setDocAction(DOCACTION_Complete);
 		
 		m_processMsg = ModelValidationEngine.get().fireDocValidate(this, ModelValidator.TIMING_AFTER_PREPARE);
 		if (m_processMsg != null)
@@ -627,39 +659,34 @@ public class MPPOrder extends X_PP_Order implements DocAction
 		}
 		BigDecimal ordered = difference;
 		
-		int M_Locator_ID = getM_Locator_ID(ordered);
+		//	Modified by Jorge Colmenarez 2020-02-24 13:20 
+		//	Comment get Locator and change validation on QtyOnHand by Reservation 
+		//int M_Locator_ID = getM_Locator_ID(ordered);
 		// Necessary to clear order quantities when called from closeIt - 4Layers
 		if (DOCACTION_Close.equals(getDocAction()))
 		{
 			/*if (!MStorageOnHand.add(getCtx(), getM_Warehouse_ID(), M_Locator_ID,
-					getM_Product_ID(), getM_AttributeSetInstance_ID(), ordered, get_TrxName()))
+					getM_Product_ID(), getM_AttributeSetInstance_ID(), ordered, get_TrxName()))*/
+			if(!MStorageReservation.add(getCtx(), getM_Warehouse_ID(), getM_Product_ID(), 
+					getM_AttributeSetInstance_ID(), ordered.negate(), !getC_DocType().isSOTrx(), get_TrxName()))
 			{
 				throw new AdempiereException();
 			}
-			 */
-			
-			
 		}
-		/*else
+		else
 		{
-			
 			//	Update Storage
-			if (!MStorageOnHand.add(getCtx(), getM_Warehouse_ID(), M_Locator_ID,
-					getM_Product_ID(), getM_AttributeSetInstance_ID(), ordered, get_TrxName()))
+			/*if (!MStorageOnHand.add(getCtx(), getM_Warehouse_ID(), M_Locator_ID,
+					getM_Product_ID(), getM_AttributeSetInstance_ID(), ordered, get_TrxName()))*/
+			if(!MStorageReservation.add(getCtx(), getM_Warehouse_ID(), getM_Product_ID(), 
+					getM_AttributeSetInstance_ID(), ordered, !getC_DocType().isSOTrx(), get_TrxName()))
 			{
 				throw new AdempiereException();
 			}
-			
-			
-		}*/
+		}
+		// End Jorge Colmenarez
 
 		setQtyReserved(getQtyReserved().add(difference));
-		//		Update Reservation Storage
-		/*if (!MStorageReservation.add(getCtx(), getM_Warehouse_ID(), 
-			getM_Product_ID(), 
-			getM_AttributeSetInstance_ID(),
-			getQtyReserved().add(difference), false, get_TrxName()))
-			throw new AdempiereException();*/
 	}
 
 	/**
