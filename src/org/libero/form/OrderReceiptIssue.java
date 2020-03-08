@@ -88,6 +88,8 @@ public class OrderReceiptIssue extends GenForm {
 	private int m_PP_Order_ID = 0;
 
 	private MPPOrder m_PP_order = null;
+	
+	private boolean m_isOnlyProduction = false;
 
 	public void configureMiniTable(IMiniTable issue) {
 		issue.addColumn(MPPOrderBOMLine.COLUMNNAME_PP_Order_BOMLine_ID); // 0
@@ -451,7 +453,7 @@ public class OrderReceiptIssue extends GenForm {
 						BigDecimal qtyBatchPerc = qtyBatch.divide(
 								Env.ONEHUNDRED, 8, RoundingMode.HALF_UP);
 
-						if (isBackflush()) { // Is Backflush - Calculate
+						if (isBackflush() || isOnlyProduction()) { // Is Backflush - Calculate
 												// Component from Qty To Deliver
 							if (qtyRequired.signum() == 0
 									|| qtyOpen.signum() == 0) {
@@ -506,7 +508,7 @@ public class OrderReceiptIssue extends GenForm {
 						else
 							issue.setValueAt(componentScrapQty, row, 9); // QtyScrap
 					} else { // Absolute Qtys (not Percentage)
-						if (isBackflush()) { // Is Backflush - Calculate
+						if (isBackflush() || isOnlyProduction()) { // Is Backflush - Calculate
 												// Component from Qty To Deliver
 							componentToDeliverQty = toDeliverQty
 									.multiply(qtyBom); // TODO: set Number scale
@@ -556,7 +558,7 @@ public class OrderReceiptIssue extends GenForm {
 
 				row++;
 
-				if (isOnlyIssue() || isBackflush()) {
+				if (isOnlyIssue() || isBackflush() || isOnlyProduction()) {
 					int warehouse_id = rs.getInt(13);
 					int product_id = rs.getInt(4);
 					row += lotes(row, id, warehouse_id, product_id,
@@ -576,7 +578,7 @@ public class OrderReceiptIssue extends GenForm {
 	public String generateSummaryTable(IMiniTable issue, String productField,
 			String uomField, String attribute, String toDeliverQty,
 			String deliveredQtyField, String scrapQtyField,
-			boolean isBackflush, boolean isOnlyIssue, boolean isOnlyReceipt) {
+			boolean isBackflush, boolean isOnlyIssue, boolean isOnlyReceipt, boolean isOnlyProduction) {
 
 		StringBuffer iText = new StringBuffer();
 
@@ -585,7 +587,7 @@ public class OrderReceiptIssue extends GenForm {
 		iText.append("</b>");
 		iText.append("<br />");
 
-		if (isOnlyReceipt || isBackflush) {
+		if (isOnlyReceipt || isBackflush || isOnlyProduction) {
 
 			String[][] table = {
 					{
@@ -601,7 +603,7 @@ public class OrderReceiptIssue extends GenForm {
 			iText.append(createHTMLTable(table));
 		}
 
-		if (isBackflush || isOnlyIssue) {
+		if (isBackflush || isOnlyIssue || isOnlyProduction) {
 			iText.append("<br /><br />");
 
 			ArrayList<String[]> table = new ArrayList<String[]>();
@@ -786,6 +788,15 @@ public class OrderReceiptIssue extends GenForm {
 	}
 
 	/**
+	 * Determines whether the Production Process is set to 'OnlyProduction'
+	 * 
+	 * @return
+	 */
+	protected boolean isOnlyProduction() {
+		return m_isOnlyProduction;
+	}
+
+	/**
 	 * Adds Attribute Set Instances Quantities to table. Extension to
 	 * {@link #executeQuery()}
 	 * 
@@ -908,6 +919,10 @@ public class OrderReceiptIssue extends GenForm {
 
 	protected void setIsOnlyIssue(boolean onlyIssue) {
 		m_OnlyIssue = onlyIssue;
+	}
+
+	protected void setIsOnlyProduction(boolean onlyProduction) {
+		m_isOnlyProduction = onlyProduction;
 	}
 
 	protected void setIsOnlyReceipt(boolean isOnlyReceipt) {

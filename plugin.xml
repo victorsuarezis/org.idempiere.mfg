@@ -336,4 +336,13 @@
             class="org.libero.process.eam.CreateMOFromForecastLine4eAM">
       </process>
    </extension>
+   <extension
+         id="net.frontuari.process.ProcessFTUProduction"
+         name="ProcessFTUProduction"
+         point="org.adempiere.base.Process">
+      <process
+            class="net.frontuari.process.ProcessFTUProduction"
+            priority="1">
+      </process>
+   </extension>
 </plugin>

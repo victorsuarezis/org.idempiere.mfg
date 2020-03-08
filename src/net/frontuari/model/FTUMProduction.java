@@ -2,10 +2,12 @@ package net.frontuari.model;
 
 import java.math.BigDecimal;
 import java.sql.ResultSet;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Properties;
 import java.util.logging.Level;
 
+import org.compiere.acct.Doc;
 import org.compiere.model.I_M_ProductionPlan;
 import org.compiere.model.MAcctSchema;
 import org.compiere.model.MClient;
@@ -13,10 +15,13 @@ import org.compiere.model.MDocType;
 import org.compiere.model.MPeriod;
 import org.compiere.model.MProduct;
 import org.compiere.model.MProduction;
+import org.compiere.model.MProductionLine;
+import org.compiere.model.MProductionLineMA;
 import org.compiere.model.MProductionPlan;
 import org.compiere.model.MSysConfig;
 import org.compiere.model.ModelValidationEngine;
 import org.compiere.model.ModelValidator;
+import org.compiere.model.PO;
 import org.compiere.model.Query;
 import org.compiere.process.DocAction;
 import org.compiere.util.AdempiereUserError;
@@ -187,6 +192,141 @@ public class FTUMProduction extends MProduction {
 			return "Attempt to create product line for Bill Of Materials with no BOM Products";
 		}
 		return null;
+	}
+	
+	@Override
+	public boolean reverseCorrectIt() 
+	{
+		if (log.isLoggable(Level.INFO)) log.info(toString());
+		// Before reverseCorrect
+		m_processMsg = ModelValidationEngine.get().fireDocValidate(this,ModelValidator.TIMING_BEFORE_REVERSECORRECT);
+		if (m_processMsg != null)
+			return false;
+
+		FTUMProduction reversal = reverse(false);
+		if (reversal == null)
+			return false;
+
+		// After reverseCorrect
+		m_processMsg = ModelValidationEngine.get().fireDocValidate(this,ModelValidator.TIMING_AFTER_REVERSECORRECT);
+		if (m_processMsg != null)
+			return false;
+
+		m_processMsg = reversal.getDocumentNo();
+
+		return true;
+	}
+	
+	protected FTUMProduction reverse(boolean accrual) {
+		Timestamp reversalDate = accrual ? Env.getContextAsDate(getCtx(), "#Date") : getMovementDate();
+		if (reversalDate == null) {
+			reversalDate = new Timestamp(System.currentTimeMillis());
+		}
+
+		MPeriod.testPeriodOpen(getCtx(), reversalDate, Doc.DOCTYPE_MatProduction, getAD_Org_ID());
+		FTUMProduction reversal = null;
+		reversal = copyFrom (reversalDate);
+
+		StringBuilder msgadd = new StringBuilder("{->").append(getDocumentNo()).append(")");
+		reversal.addDescription(msgadd.toString());
+		reversal.setReversal_ID(getM_Production_ID());
+		reversal.saveEx(get_TrxName());
+		
+		// Reverse Line Qty
+		MProductionLine[] sLines = getLines();
+		MProductionLine[] tLines = reversal.getLines();
+		for (int i = 0; i < sLines.length; i++)
+		{		
+			//	We need to copy MA
+			if (sLines[i].getM_AttributeSetInstance_ID() == 0)
+			{
+				MProductionLineMA mas[] = MProductionLineMA.get(getCtx(), sLines[i].get_ID(), get_TrxName());
+				for (int j = 0; j < mas.length; j++)
+				{
+					MProductionLineMA ma = new MProductionLineMA (tLines[i],
+						mas[j].getM_AttributeSetInstance_ID(),
+						mas[j].getMovementQty().negate(),mas[j].getDateMaterialPolicy());
+					ma.saveEx(get_TrxName());					
+				}
+			}
+		}
+
+		if (!reversal.processIt(DocAction.ACTION_Complete))
+		{
+			m_processMsg = "Reversal ERROR: " + reversal.getProcessMsg();
+			return null;
+		}
+
+		reversal.closeIt();
+		reversal.setProcessing (false);
+		reversal.setDocStatus(DOCSTATUS_Reversed);
+		reversal.setDocAction(DOCACTION_None);
+		reversal.saveEx(get_TrxName());
+
+		msgadd = new StringBuilder("(").append(reversal.getDocumentNo()).append("<-)");
+		addDescription(msgadd.toString());
+
+		setProcessed(true);
+		setReversal_ID(reversal.getM_Production_ID());
+		setDocStatus(DOCSTATUS_Reversed);	//	may come from void
+		setDocAction(DOCACTION_None);		
+
+		return reversal;
+	}
+	
+	protected FTUMProduction copyFrom(Timestamp reversalDate) {
+		FTUMProduction to = new FTUMProduction(getCtx(), 0, get_TrxName());
+		PO.copyValues (this, to, getAD_Client_ID(), getAD_Org_ID());
+
+		to.set_ValueNoCheck ("DocumentNo", null);
+		//
+		to.setDocStatus (DOCSTATUS_Drafted);		//	Draft
+		to.setDocAction(DOCACTION_Complete);
+		to.setMovementDate(reversalDate);
+		to.setIsComplete(false);
+		to.setIsCreated("Y");
+		to.setProcessing(false);
+		to.setProcessed(false);
+		to.setIsUseProductionPlan(isUseProductionPlan());
+		if (isUseProductionPlan()) {
+			to.saveEx();
+			Query planQuery = new Query(Env.getCtx(), I_M_ProductionPlan.Table_Name, "M_ProductionPlan.M_Production_ID=?", get_TrxName());
+			List<MProductionPlan> fplans = planQuery.setParameters(getM_Production_ID()).list();
+			for(MProductionPlan fplan : fplans) {
+				MProductionPlan tplan = new MProductionPlan(getCtx(), 0, get_TrxName());
+				PO.copyValues (fplan, tplan, getAD_Client_ID(), getAD_Org_ID());
+				tplan.setM_Production_ID(to.getM_Production_ID());
+				tplan.setProductionQty(fplan.getProductionQty().negate());
+				tplan.setProcessed(false);
+				tplan.saveEx();
+
+				MProductionLine[] flines = fplan.getLines();
+				for(MProductionLine fline : flines) {
+					MProductionLine tline = new MProductionLine(tplan);
+					PO.copyValues (fline, tline, getAD_Client_ID(), getAD_Org_ID());
+					tline.setM_ProductionPlan_ID(tplan.getM_ProductionPlan_ID());
+					tline.setMovementQty(fline.getMovementQty().negate());
+					tline.setPlannedQty(fline.getPlannedQty().negate());
+					tline.setQtyUsed(fline.getQtyUsed().negate());
+					tline.saveEx();
+				}
+			}
+		} else {
+			to.setProductionQty(getProductionQty().negate());	
+			to.saveEx();
+			MProductionLine[] flines = getLines();
+			for(MProductionLine fline : flines) {
+				MProductionLine tline = new MProductionLine(to);
+				PO.copyValues (fline, tline, getAD_Client_ID(), getAD_Org_ID());
+				tline.setM_Production_ID(to.getM_Production_ID());
+				tline.setMovementQty(fline.getMovementQty().negate());
+				tline.setPlannedQty(fline.getPlannedQty().negate());
+				tline.setQtyUsed(fline.getQtyUsed().negate());
+				tline.saveEx();
+			}
+		}
+
+		return to;
 	}
 	
 }

@@ -31,6 +31,7 @@ import org.compiere.model.MLocator;
 import org.compiere.model.MOrder;
 import org.compiere.model.MOrderLine;
 import org.compiere.model.MProduct;
+import org.compiere.model.MProduction;
 import org.compiere.model.MProject;
 import org.compiere.model.MResource;
 import org.compiere.model.MStorageOnHand;
@@ -653,11 +654,16 @@ public class MPPOrder extends X_PP_Order implements DocAction
 		}
 		BigDecimal target = getQtyOrdered();
 		BigDecimal difference = target.subtract(getQtyReserved()).subtract(getQtyDelivered());
-		if (difference.signum() == 0)
+		if (difference.signum() == 0 && !DOCACTION_Close.equals(getDocAction()))
 		{
 			return ;
 		}
 		BigDecimal ordered = difference;
+		
+		if(ordered.signum() == 0 && getQtyDelivered().signum() == 0 && DOCACTION_Close.equals(getDocAction()))
+		{
+			ordered = getQtyReserved().negate();
+		}
 		
 		//	Modified by Jorge Colmenarez 2020-02-24 13:20 
 		//	Comment get Locator and change validation on QtyOnHand by Reservation 
@@ -668,7 +674,7 @@ public class MPPOrder extends X_PP_Order implements DocAction
 			/*if (!MStorageOnHand.add(getCtx(), getM_Warehouse_ID(), M_Locator_ID,
 					getM_Product_ID(), getM_AttributeSetInstance_ID(), ordered, get_TrxName()))*/
 			if(!MStorageReservation.add(getCtx(), getM_Warehouse_ID(), getM_Product_ID(), 
-					getM_AttributeSetInstance_ID(), ordered.negate(), !getC_DocType().isSOTrx(), get_TrxName()))
+					getM_AttributeSetInstance_ID(), ordered, !getC_DocType().isSOTrx(), get_TrxName()))
 			{
 				throw new AdempiereException();
 			}
@@ -1498,6 +1504,12 @@ public class MPPOrder extends X_PP_Order implements DocAction
 				return true;
 			}
 		}
+		
+		if(hasProduction())
+		{
+			return true;
+		}
+		
 		return false;		
 	}
 	
@@ -1901,6 +1913,18 @@ public class MPPOrder extends X_PP_Order implements DocAction
 			//setQtyDelivered(getQtyOpen());
 			//return DOCSTATUS_Closed;
 		}
+	}
+	
+	public boolean hasProduction()
+	{
+		boolean produced = false;
+		
+		int qty = DB.getSQLValue(get_TrxName(), "SELECT COUNT(*) FROM M_Production WHERE PP_Order_ID = ? AND DocStatus = 'CO'",get_ID());
+		
+		if(qty > 0)
+			produced = true;
+		
+		return produced;
 	}
  
 } // MPPOrder

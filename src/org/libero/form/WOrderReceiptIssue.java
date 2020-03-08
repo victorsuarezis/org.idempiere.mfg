@@ -59,6 +59,7 @@ import org.compiere.model.MLookup;
 import org.compiere.model.MLookupFactory;
 import org.compiere.model.MProduct;
 import org.compiere.model.MTab;
+import org.compiere.model.MWarehouse;
 import org.compiere.model.MWindow;
 import org.compiere.util.DisplayType;
 import org.compiere.util.Env;
@@ -159,7 +160,8 @@ ValueChangeListener,Serializable,WTableModelListener
 	private WListbox issue = ListboxFactory.newDataTable();
 	private WDateEditor movementDateField = new WDateEditor("MovementDate", true, false, true,  "MovementDate");	
 	
-	private WLocatorEditor locatorField = null;
+	//private WLocatorEditor locatorField = null;
+	private WSearchEditor locatorField = null;
 	
 	private Combobox pickcombo = new Combobox();
 	
@@ -233,8 +235,12 @@ ValueChangeListener,Serializable,WTableModelListener
 													DisplayType.TableDir);
 		uomorderField = new WSearchEditor(MPPOrder.COLUMNNAME_C_UOM_ID, false, false, false, uomOrderLookup);
 
-		MLocatorLookup locatorL = new MLocatorLookup(ctx, m_WindowNo);
-		locatorField = new WLocatorEditor(MLocator.COLUMNNAME_M_Locator_ID, true, false, true, locatorL, m_WindowNo);
+		//MLocatorLookup locatorL = new MLocatorLookup(ctx, m_WindowNo);
+		//locatorField = new WLocatorEditor(MLocator.COLUMNNAME_M_Locator_ID, true, false, true, locatorL, m_WindowNo);
+		MLookup locatorL = MLookupFactory.get(ctx, m_WindowNo, 0,
+				MColumn.getColumn_ID(MPPOrderBOMLine.Table_Name, MPPOrderBOMLine.COLUMNNAME_M_Locator_ID),
+				DisplayType.TableDir);
+		locatorField = new WSearchEditor(MPPOrderBOMLine.COLUMNNAME_M_Locator_ID, false, false, false, locatorL);
 
 		
 		//  Tab, Window
@@ -253,6 +259,7 @@ ValueChangeListener,Serializable,WTableModelListener
 		scrapQtyField.setValue(Env.ZERO);
 		rejectQty.setValue(Env.ZERO);
 		// 4Layers - end
+		pickcombo.appendItem(Msg.translate(Env.getCtx(),"OnlyProduction"),4);
 		pickcombo.appendItem(Msg.translate(Env.getCtx(),"IsBackflush"), 1);
 		pickcombo.appendItem(Msg.translate(Env.getCtx(),"OnlyIssue"),2);
 		pickcombo.appendItem(Msg.translate(Env.getCtx(),"OnlyReceipt"),3);
@@ -517,6 +524,16 @@ ValueChangeListener,Serializable,WTableModelListener
 				issue.setVisible(true);
 				executeQuery();
 			}
+			else if (isOnlyProduction())
+			{
+				enableToDeliver();
+				locatorLabel.setVisible(true);
+				locatorField.setVisible(true);
+				attribute.setVisible(true);
+				attributeLabel.setVisible(true);
+				issue.setVisible(true);
+				executeQuery();
+			}
 			setToDeliverQty(getOpenQty()); //reset toDeliverQty to openQty
 		}
 	}
@@ -575,6 +592,7 @@ ValueChangeListener,Serializable,WTableModelListener
 			{
 				setS_Resource_ID(pp_order.getS_Resource_ID());
 				setM_Warehouse_ID(pp_order.getM_Warehouse_ID());
+				setM_Locator_ID(MLocator.getDefault( (MWarehouse) pp_order.getM_Warehouse()).get_ID());
 				setDeliveredQty(pp_order.getQtyDelivered());
 				setOrderedQty(pp_order.getQtyOrdered());
 				//m_PP_order.getQtyOrdered().subtract(m_PP_order.getQtyDelivered());
@@ -605,6 +623,7 @@ ValueChangeListener,Serializable,WTableModelListener
 				executeQuery();
 			}
 		}
+		
 	}
 	
 	
@@ -636,7 +655,7 @@ ValueChangeListener,Serializable,WTableModelListener
 				toDeliverQty.getDisplay(), 
 				deliveredQtyField.getDisplay(),
 				scrapQtyField.getDisplay(),
-				isBackflush(), isOnlyIssue(), isOnlyReceipt()		
+				isBackflush(), isOnlyIssue(), isOnlyReceipt(), isOnlyProduction()		
 		));
 		
 	} //  generateInvoices_complete
@@ -670,6 +689,16 @@ ValueChangeListener,Serializable,WTableModelListener
 	{
 		super.setIsBackflush(pickcombo.getText().equals("IsBackflush"));
 		return super.isBackflush();
+	}
+	
+	/**
+	 * Determines whether the Delivery Rule is set to 'OnlyIssue'
+	 * @return	
+	 */
+	protected boolean isOnlyProduction() 
+	{
+		super.setIsOnlyProduction(pickcombo.getText().equals("OnlyProduction"));
+		return super.isOnlyProduction();
 	}
 
 	protected Timestamp getMovementDate()
@@ -895,16 +924,7 @@ ValueChangeListener,Serializable,WTableModelListener
 					MPPOrder order = new MPPOrder(Env.getCtx(), getPP_Order_ID(), trxName);
 					if (isBackflush() || isOnlyIssue()) 
 					{
-						//createIssue(order, issue);
-						// Added by Jorge Colmenarez 2020-02-24 18:55, create production document
-						try {
-							createProduction(order,issue,getM_Locator_ID(),getToDeliverQty(),trxName);
-						}
-						catch(Exception e) {
-							showMessage(e.getLocalizedMessage(), true);
-							throw new AdempiereException(e.getLocalizedMessage());
-						}
-						// End Jorge Colmenarez
+						createIssue(order, issue);
 					}
 					if (isOnlyReceipt() || isBackflush()) 
 					{
@@ -923,6 +943,24 @@ ValueChangeListener,Serializable,WTableModelListener
 							order.closeIt();
 							order.saveEx();
 						}
+					}
+					if(isOnlyProduction())
+					{
+						// Added by Jorge Colmenarez 2020-02-24 18:55, create production document
+						try {
+							createProduction(order,issue,getM_Locator_ID(),getToDeliverQty(),trxName);
+							if (isCloseDocument)
+							{
+								order.setDateFinish(getMovementDate());
+								order.closeIt();
+								order.saveEx(trxName);
+							}
+						}
+						catch(Exception e) {
+							showMessage(e.getLocalizedMessage(), true);
+							throw new AdempiereException(e.getLocalizedMessage());
+						}
+						// End Jorge Colmenarez
 					}
 				}});
 		}
