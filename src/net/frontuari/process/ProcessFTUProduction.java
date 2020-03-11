@@ -12,6 +12,7 @@ public class ProcessFTUProduction extends SvrProcess {
 
 	@Override
 	protected void prepare() {
+		System.out.println("Hola");
 	}
 
 	@Override
@@ -34,6 +35,7 @@ public class ProcessFTUProduction extends SvrProcess {
 						order.setDocStatus(MPPOrder.DOCSTATUS_Completed);
 						order.setDocAction(MPPOrder.ACTION_Close);
 						order.setDescription("");
+						order.setQtyOrdered(order.getQtyEntered());
 						order.saveEx(get_TrxName());
 					}
 					return "Produccion: " + production.getDocumentNo() + " Procesada Satisfactoriamente! - " + production.getDocStatus();
