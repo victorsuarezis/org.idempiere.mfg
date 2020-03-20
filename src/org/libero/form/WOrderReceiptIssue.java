@@ -87,6 +87,8 @@ import org.zkoss.zul.Tabpanels;
  *  @author Cristina Ghita, www.arhipac.ro
  *  @author Adi Takacs, www.arhipac.ro
  *  @author victor.perez@e-evolution.com, www.e-evolution.com
+ *  @author Jorge Colmenarez, www.frontuari.net
+ *  	Support for generate production
  */
 
 public class WOrderReceiptIssue extends OrderReceiptIssue  implements IFormController, EventListener,  
@@ -618,7 +620,7 @@ ValueChangeListener,Serializable,WTableModelListener
 		
 		if (name.equals(toDeliverQty.getColumnName()) || name.equals(scrapQtyField.getColumnName()))
 		{
-			if (getPP_Order_ID() > 0 && isBackflush())
+			if (getPP_Order_ID() > 0 && (isBackflush() || isOnlyProduction()))
 			{
 				executeQuery();
 			}
@@ -667,7 +669,7 @@ ValueChangeListener,Serializable,WTableModelListener
 	 */
 	protected boolean isOnlyReceipt() 
 	{
-		super.setIsOnlyReceipt(pickcombo.getText().equals("OnlyReceipt"));
+		super.setIsOnlyReceipt(pickcombo.getText().equals(Msg.translate(Env.getCtx(),"OnlyReciept")));
 		return super.isOnlyReceipt();
 	}
 	
@@ -677,7 +679,7 @@ ValueChangeListener,Serializable,WTableModelListener
 	 */
 	protected boolean isOnlyIssue() 
 	{
-		super.setIsOnlyIssue(pickcombo.getText().equals("OnlyIssue"));
+		super.setIsOnlyIssue(pickcombo.getText().equals(Msg.translate(Env.getCtx(),"OnlyIssue")));
 		return super.isOnlyIssue();
 	}
 
@@ -687,7 +689,7 @@ ValueChangeListener,Serializable,WTableModelListener
 	 */
 	protected boolean isBackflush()
 	{
-		super.setIsBackflush(pickcombo.getText().equals("IsBackflush"));
+		super.setIsBackflush(pickcombo.getText().equals(Msg.translate(Env.getCtx(),"isBackflush")));
 		return super.isBackflush();
 	}
 	
@@ -697,7 +699,7 @@ ValueChangeListener,Serializable,WTableModelListener
 	 */
 	protected boolean isOnlyProduction() 
 	{
-		super.setIsOnlyProduction(pickcombo.getText().equals("OnlyProduction"));
+		super.setIsOnlyProduction(pickcombo.getText().equals(Msg.translate(Env.getCtx(),"OnlyProduction")));
 		return super.isOnlyProduction();
 	}
 

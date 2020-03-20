@@ -26,7 +26,6 @@ import org.compiere.model.MDocType;
 import org.compiere.model.MMovement;
 import org.compiere.model.MMovementLine;
 import org.compiere.model.MQuery;
-import org.compiere.model.MStorageReservation;
 import org.compiere.model.MTable;
 import org.compiere.model.PrintInfo;
 import org.compiere.print.MPrintFormat;

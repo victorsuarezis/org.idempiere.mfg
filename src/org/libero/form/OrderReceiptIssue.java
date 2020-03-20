@@ -1054,7 +1054,7 @@ public class OrderReceiptIssue extends GenForm {
 				 mpl.setLine(lineNumber);
 				 mpl.setM_Product_ID(productID);
 				 mpl.setM_Locator_ID(locatorID);
-				 mpl.setPlannedQty(lines[0].getQtyEntered());
+				 mpl.setPlannedQty(lines[0].getQtyRequired());
 				 if(lines[0].get_ValueAsBoolean("IsDerivative")) {
 					 mpl.setIsEndProduct(true);
 					 mpl.setMovementQty(qtyLine);

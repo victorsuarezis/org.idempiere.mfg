@@ -3,8 +3,10 @@ package net.frontuari.process;
 import org.compiere.model.MProduction;
 import org.compiere.process.SvrProcess;
 import org.compiere.util.DB;
+import org.compiere.util.Env;
 import org.compiere.util.Msg;
 import org.libero.model.MPPOrder;
+import org.libero.model.MPPOrderBOMLine;
 
 import net.frontuari.model.FTUMProduction;
 
@@ -37,6 +39,12 @@ public class ProcessFTUProduction extends SvrProcess {
 						order.setDescription("");
 						order.setQtyOrdered(order.getQtyEntered());
 						order.saveEx(get_TrxName());
+						for(MPPOrderBOMLine line : order.getLines())
+						{
+							line.setQtyEntered(line.getQtyDelivered());
+							line.setQtyDelivered(Env.ZERO);
+							line.saveEx(get_TrxName());
+						}
 					}
 					return "Produccion: " + production.getDocumentNo() + " Procesada Satisfactoriamente! - " + production.getDocStatus();
 				} else {
