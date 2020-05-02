@@ -32,7 +32,6 @@ import org.compiere.minigrid.IDColumn;
 import org.compiere.minigrid.IMiniTable;
 import org.compiere.model.MAttributeSetInstance;
 import org.compiere.model.MProduct;
-import org.compiere.model.MProductionLine;
 import org.compiere.model.MStorageOnHand;
 import org.compiere.util.CLogger;
 import org.compiere.util.DB;
@@ -43,6 +42,7 @@ import org.libero.model.MPPOrder;
 import org.libero.model.MPPOrderBOMLine;
 
 import net.frontuari.model.FTUMProduction;
+import net.frontuari.model.FTUMProductionLine;
 
 import org.eevolution.model.MPPProductBOMLine;
 
@@ -1001,7 +1001,7 @@ public class OrderReceiptIssue extends GenForm {
 		
 		int lineNumber = 10;
 		
-		MProductionLine mpl1 = new MProductionLine(production);
+		FTUMProductionLine mpl1 = new FTUMProductionLine(production);
 		 mpl1.setAD_Org_ID(order.getAD_Org_ID());
 		 mpl1.setLine(lineNumber);
 		 mpl1.setM_Product_ID(order.getM_Product_ID());
@@ -1049,7 +1049,7 @@ public class OrderReceiptIssue extends GenForm {
 				//	Only one record
 				MPPOrderBOMLine[] lines = order.getLines(true,"M_Product_ID = "+productID);
 				
-				MProductionLine mpl = new MProductionLine(production);
+				FTUMProductionLine mpl = new FTUMProductionLine(production);
 				 mpl.setAD_Org_ID(order.getAD_Org_ID());
 				 mpl.setLine(lineNumber);
 				 mpl.setM_Product_ID(productID);

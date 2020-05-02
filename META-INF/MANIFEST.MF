@@ -54,7 +54,7 @@ Export-Package: junit.extensions,
  org.libero.tools.worker
 Bundle-ActivationPolicy: lazy
 Bundle-Activator: org.adempiere.plugin.utils.Incremental2PackActivator
-Bundle-Vendor: E-Evolution, Red1.org
+Bundle-Vendor: E-Evolution, Red1.org, Frontuari
 Bundle-ClassPath: .,
  lib/junit.jar,
  lib/slf4j-api.jar

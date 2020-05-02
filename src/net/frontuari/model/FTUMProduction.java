@@ -1,12 +1,16 @@
 package net.frontuari.model;
 
 import java.math.BigDecimal;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.logging.Level;
 
+import org.adempiere.exceptions.AdempiereException;
 import org.compiere.acct.Doc;
 import org.compiere.model.I_M_ProductionPlan;
 import org.compiere.model.MAcctSchema;
@@ -15,7 +19,6 @@ import org.compiere.model.MDocType;
 import org.compiere.model.MPeriod;
 import org.compiere.model.MProduct;
 import org.compiere.model.MProduction;
-import org.compiere.model.MProductionLine;
 import org.compiere.model.MProductionLineMA;
 import org.compiere.model.MProductionPlan;
 import org.compiere.model.MSysConfig;
@@ -84,6 +87,100 @@ public class FTUMProduction extends MProduction {
 		if (!DOCACTION_Complete.equals(getDocAction()))
 			setDocAction(DOCACTION_Complete);
 		return DocAction.STATUS_InProgress;
+	}
+	
+	@Override
+	public String completeIt()
+	{
+		// Re-Check
+		if (!m_justPrepared)
+		{
+			String status = prepareIt();
+			m_justPrepared = false;
+			if (!DocAction.STATUS_InProgress.equals(status))
+				return status;
+		}
+
+		m_processMsg = ModelValidationEngine.get().fireDocValidate(this, ModelValidator.TIMING_BEFORE_COMPLETE);
+		if (m_processMsg != null)
+			return DocAction.STATUS_Invalid;
+
+		StringBuilder errors = new StringBuilder();
+		int processed = 0;
+			
+		if (!isUseProductionPlan()) {
+			FTUMProductionLine[] lines = getLines();
+			//IDEMPIERE-3107 Check if End Product in Production Lines exist
+			if(!isHaveEndProduct(lines)) {
+				m_processMsg = "Production does not contain End Product";
+				return DocAction.STATUS_Invalid;
+			}
+			errors.append(processLines(lines));
+			if (errors.length() > 0) {
+				m_processMsg = errors.toString();
+				return DocAction.STATUS_Invalid;
+			}
+			processed = processed + lines.length;
+		} else {
+			Query planQuery = new Query(Env.getCtx(), I_M_ProductionPlan.Table_Name, "M_ProductionPlan.M_Production_ID=?", get_TrxName());
+			List<MProductionPlan> plans = planQuery.setParameters(getM_Production_ID()).list();
+			for(MProductionPlan plan : plans) {
+				FTUMProductionLine[] lines = (FTUMProductionLine[]) plan.getLines();
+				
+				//IDEMPIERE-3107 Check if End Product in Production Lines exist
+				if(!isHaveEndProduct(lines)) {
+					m_processMsg = String.format("Production plan (line %1$d id %2$d) does not contain End Product", plan.getLine(), plan.get_ID());
+					return DocAction.STATUS_Invalid;
+				}
+				
+				if (lines.length > 0) {
+					errors.append(processLines(lines));
+					if (errors.length() > 0) {
+						m_processMsg = errors.toString();
+						return DocAction.STATUS_Invalid;
+					}
+					processed = processed + lines.length;
+				}
+				plan.setProcessed(true);
+				plan.saveEx();
+			}
+		}
+
+		//		User Validation
+		String valid = ModelValidationEngine.get().fireDocValidate(this, ModelValidator.TIMING_AFTER_COMPLETE);
+		if (valid != null)
+		{
+			m_processMsg = valid;
+			return DocAction.STATUS_Invalid;
+		}
+
+		setProcessed(true);
+		setDocAction(DOCACTION_Close);
+		return DocAction.STATUS_Completed;
+	}
+
+	private boolean isHaveEndProduct(FTUMProductionLine[] lines) {
+		
+		for(FTUMProductionLine line : lines) {
+			if(line.isEndProduct())
+				return true; 
+		}
+		return false;
+	}
+	
+	protected Object processLines(FTUMProductionLine[] lines) {
+		StringBuilder errors = new StringBuilder();
+		for ( int i = 0; i<lines.length; i++) {
+			String error = lines[i].createTransactions(getMovementDate(), false);
+			if (!Util.isEmpty(error)) {
+				errors.append(error);
+			} else { 
+				lines[i].setProcessed( true );
+				lines[i].saveEx(get_TrxName());
+			}
+		}
+
+		return errors.toString();
 	}
 	
 	@Override
@@ -233,8 +330,8 @@ public class FTUMProduction extends MProduction {
 		reversal.saveEx(get_TrxName());
 		
 		// Reverse Line Qty
-		MProductionLine[] sLines = getLines();
-		MProductionLine[] tLines = reversal.getLines();
+		FTUMProductionLine[] sLines = getLines();
+		FTUMProductionLine[] tLines = reversal.getLines();
 		for (int i = 0; i < sLines.length; i++)
 		{		
 			//	We need to copy MA
@@ -300,9 +397,9 @@ public class FTUMProduction extends MProduction {
 				tplan.setProcessed(false);
 				tplan.saveEx();
 
-				MProductionLine[] flines = fplan.getLines();
-				for(MProductionLine fline : flines) {
-					MProductionLine tline = new MProductionLine(tplan);
+				FTUMProductionLine[] flines = (FTUMProductionLine[]) fplan.getLines();
+				for(FTUMProductionLine fline : flines) {
+					FTUMProductionLine tline = new FTUMProductionLine(tplan);
 					PO.copyValues (fline, tline, getAD_Client_ID(), getAD_Org_ID());
 					tline.setM_ProductionPlan_ID(tplan.getM_ProductionPlan_ID());
 					tline.setMovementQty(fline.getMovementQty().negate());
@@ -314,9 +411,9 @@ public class FTUMProduction extends MProduction {
 		} else {
 			to.setProductionQty(getProductionQty().negate());	
 			to.saveEx();
-			MProductionLine[] flines = getLines();
-			for(MProductionLine fline : flines) {
-				MProductionLine tline = new MProductionLine(to);
+			FTUMProductionLine[] flines = getLines();
+			for(FTUMProductionLine fline : flines) {
+				FTUMProductionLine tline = new FTUMProductionLine(to);
 				PO.copyValues (fline, tline, getAD_Client_ID(), getAD_Org_ID());
 				tline.setM_Production_ID(to.getM_Production_ID());
 				tline.setMovementQty(fline.getMovementQty().negate());
@@ -327,6 +424,39 @@ public class FTUMProduction extends MProduction {
 		}
 
 		return to;
+	}
+	
+	public FTUMProductionLine[] getLines() {
+		ArrayList<FTUMProductionLine> list = new ArrayList<FTUMProductionLine>();
+		
+		String sql = "SELECT pl.M_ProductionLine_ID "
+			+ "FROM M_ProductionLine pl "
+			+ "WHERE pl.M_Production_ID = ?";
+		
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try
+		{
+			pstmt = DB.prepareStatement(sql, get_TrxName());
+			pstmt.setInt(1, get_ID());
+			rs = pstmt.executeQuery();
+			while (rs.next())
+				list.add( new FTUMProductionLine( getCtx(), rs.getInt(1), get_TrxName() ) );	
+		}
+		catch (SQLException ex)
+		{
+			throw new AdempiereException("Unable to load production lines", ex);
+		}
+		finally
+		{
+			DB.close(rs, pstmt);
+			rs = null;
+			pstmt = null;
+		}
+		
+		FTUMProductionLine[] retValue = new FTUMProductionLine[list.size()];
+		list.toArray(retValue);
+		return retValue;
 	}
 	
 }

@@ -16,6 +16,7 @@ import org.eevolution.model.MPPProductPlanning;
 import org.libero.model.*;
 
 import net.frontuari.model.FTUMProduction;
+import net.frontuari.model.FTUMProductionLine;
 
 public class MFG_ModelFactory implements IModelFactory {
 
@@ -96,6 +97,8 @@ public class MFG_ModelFactory implements IModelFactory {
 			   return LiberoMovementLine.class;
 		   } else if (tableName.equals(FTUMProduction.Table_Name)){
 			   return FTUMProduction.class;
+		   } else if (tableName.equals(FTUMProductionLine.Table_Name)){
+			   return FTUMProductionLine.class;
 		   } else 	   
 			   return null;
 	}
@@ -176,10 +179,12 @@ public class MFG_ModelFactory implements IModelFactory {
 
 		   } else if (tableName.equals(MOrder.Table_Name)) {
 			     return new MOrder(Env.getCtx(), Record_ID, trxName);
-		   }else if (tableName.equals(LiberoMovementLine.Table_Name)){
+		   } else if (tableName.equals(LiberoMovementLine.Table_Name)){
 			   return new LiberoMovementLine(Env.getCtx(), Record_ID, trxName);
-		   }else if (tableName.equals(FTUMProduction.Table_Name)){
+		   } else if (tableName.equals(FTUMProduction.Table_Name)){
 			   return new FTUMProduction(Env.getCtx(), Record_ID, trxName);
+		   } else if (tableName.equals(FTUMProductionLine.Table_Name)){
+			   return new FTUMProductionLine(Env.getCtx(), Record_ID, trxName);
 		   }
 		   return null;
 	}
@@ -263,9 +268,10 @@ public class MFG_ModelFactory implements IModelFactory {
 
 		   } else if (tableName.equals(MOrder.Table_Name)) {
 			     return new MOrder(Env.getCtx(), rs, trxName);
-		   } 
-		   else if (tableName.equals(FTUMProduction.Table_Name)) {
+		   } else if (tableName.equals(FTUMProduction.Table_Name)) {
 			     return new FTUMProduction(Env.getCtx(), rs, trxName);
+		   } else if (tableName.equals(FTUMProductionLine.Table_Name)) {
+			     return new FTUMProductionLine(Env.getCtx(), rs, trxName);
 		   }
 		   return null;
 	}
