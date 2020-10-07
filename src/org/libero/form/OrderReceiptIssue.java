@@ -1067,7 +1067,7 @@ public class OrderReceiptIssue extends GenForm {
 				 lineNumber = lineNumber + 10;
 		 }
 		 
-		 if(!production.processIt(FTUMProduction.DOCACTION_Complete)) {
+		 if(!production.processIt(FTUMProduction.DOCACTION_Prepare)) {
 			 throw new AdempiereException(production.getProcessMsg());
 		 }
 		 production.saveEx(trxName);
