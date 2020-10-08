@@ -1005,10 +1005,11 @@ public class OrderReceiptIssue extends GenForm {
 		 mpl1.setAD_Org_ID(order.getAD_Org_ID());
 		 mpl1.setLine(lineNumber);
 		 mpl1.setM_Product_ID(order.getM_Product_ID());
-		 mpl1.setIsEndProduct(true);
+		 mpl1.setIsEndProduct(true); 
 		 mpl1.setPlannedQty(order.getQtyEntered());
 		 mpl1.setMovementQty(qty);
 		 mpl1.setM_Locator_ID(LocatorID);
+		 
 		 mpl1.saveEx(trxName);
 		 
 		 lineNumber = lineNumber + 10;
@@ -1046,6 +1047,7 @@ public class OrderReceiptIssue extends GenForm {
 				KeyNamePair locatorkey = (KeyNamePair) m_issue[i][0].get(7);
 				int locatorID = locatorkey.getKey();
 				BigDecimal qtyLine = (BigDecimal) m_issue[i][0].get(4);
+				//BigDecimal scpQty = (BigDecimal) m_issue[i][0].get(9);
 				//	Only one record
 				MPPOrderBOMLine[] lines = order.getLines(true,"M_Product_ID = "+productID);
 				
@@ -1055,6 +1057,7 @@ public class OrderReceiptIssue extends GenForm {
 				 mpl.setM_Product_ID(productID);
 				 mpl.setM_Locator_ID(locatorID);
 				 mpl.setPlannedQty(lines[0].getQtyRequired());
+				 //mpl.set_ValueOfColumn("ScrappedQty",getScrapQty() );
 				 if(lines[0].get_ValueAsBoolean("IsDerivative")) {
 					 mpl.setIsEndProduct(true);
 					 mpl.setMovementQty(qtyLine);
