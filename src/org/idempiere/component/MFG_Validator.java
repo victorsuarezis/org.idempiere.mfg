@@ -22,6 +22,7 @@ import org.compiere.model.I_M_Movement;
 import org.compiere.model.I_M_Product;
 import org.compiere.model.I_M_Requisition;
 import org.compiere.model.I_M_RequisitionLine;
+import org.compiere.model.MDocType;
 import org.compiere.model.MForecastLine;
 import org.compiere.model.MInOut;
 import org.compiere.model.MInOutLine;
@@ -155,6 +156,13 @@ public class MFG_Validator extends AbstractEventHandler {
 				isReleased = DocAction.STATUS_InProgress.equals(docStatus)
 							|| DocAction.STATUS_Completed.equals(docStatus);
 				isVoided = DocAction.STATUS_Voided.equals(docStatus);
+				// Check Document Configuration With Update MRP
+				int C_DocType_ID = po.get_ValueAsInt("C_DocTypeTarget_ID");
+				if(C_DocType_ID <=0)
+					C_DocType_ID = po.get_ValueAsInt("C_DocType_ID");
+				MDocType docType = new MDocType(po.getCtx(), C_DocType_ID, po.get_TrxName()); 
+				if(!docType.get_ValueAsBoolean("IsUpdateMRP"))
+					return;
 			}
 		
 			// Can we change M_Product.C_UOM_ID ?
