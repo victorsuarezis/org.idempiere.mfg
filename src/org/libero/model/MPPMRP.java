@@ -44,6 +44,7 @@ import org.compiere.model.MRequisition;
 import org.compiere.model.MRequisitionLine;
 import org.compiere.model.MResource;
 import org.compiere.model.MResourceAssignment;
+import org.compiere.model.MSysConfig;
 import org.compiere.model.PO;
 import org.compiere.model.Query;
 import org.compiere.model.X_M_Forecast;
@@ -94,6 +95,10 @@ public class MPPMRP extends X_PP_MRP implements DocAction
         if (!product.isBOM())
             return 0;
         //<stevenyanzhi@gmail.com>
+        
+        // Se hace configurable las acciones de este metodo - victor.suarez.is@gmail.com - 05/2021
+        if(!MSysConfig.getBooleanValue("MFG_CreateMOMakeTo", false))
+        	return 0;
         
 		final String whereClause = MPPProductBOM.COLUMNNAME_BOMType+" IN (?,?)"
 					   +" AND "+MPPProductBOM.COLUMNNAME_BOMUse+"=?"
